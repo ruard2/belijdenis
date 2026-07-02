@@ -1,0 +1,339 @@
+{
+  "id": "belijdenis_003",
+  "course_id": "belijdenis",
+  "slug": "god-of-het-lot",
+  "title": "God of het lot?",
+  "subtitle": "Over Gods voorzienigheid",
+  "description": "Jongeren verkennen Gods voorzienigheid als aangevochten geloof: God onderhoudt en regeert, de mens blijft verantwoordelijk, lijden roept vragen op, en toch mag je vertrouwen op de Vader om Christus' wil.",
+  "xp": 125,
+  "status": "published",
+  "sort_order": 3,
+  "blocks": [
+    {
+      "id": "belijdenis_003_hero",
+      "type": "hero",
+      "title": "God of het lot?",
+      "xp": 0,
+      "required": true,
+      "sort_order": 1,
+      "content": {
+        "subtitle": "Over Gods voorzienigheid",
+        "question": "Kun jij vertrouwen op God als je Hem niet begrijpt?",
+        "body": "Lijden maakt geloven kwetsbaar. Veel christelijke jongeren herkennen dat: door verdriet, ziekte, onrecht of verlies kun je gaan twijfelen aan God. Dit hoofdstuk gaat daarom niet over een makkelijke theorie, maar over de vraag of je leven wordt gedragen door een Vader, of overgeleverd is aan toeval en lot.",
+        "image_url": ""
+      }
+    },
+    {
+      "id": "belijdenis_003_reading_plan",
+      "type": "reading_plan",
+      "title": "Leesrooster",
+      "xp": 14,
+      "required": false,
+      "sort_order": 2,
+      "content": {
+        "intro": "Deze week lees je gedeelten over lijden, vertrouwen, Gods zorg en hoop. De Bijbel maakt het kwaad niet klein, maar leert wel dat God niet afwezig is.",
+        "focus": "Let bij elke lezing op twee vragen: wat zegt dit gedeelte over Gods macht en zorg, en wat vraagt het van jouw vertrouwen?",
+        "readings": [
+          {
+            "day": "Dag 1",
+            "reference": "Job 1",
+            "theme": "Job verliest veel, maar de vraag naar God blijft open."
+          },
+          {
+            "day": "Dag 2",
+            "reference": "Job 2",
+            "theme": "Lijden raakt lichaam, relaties en geloof."
+          },
+          {
+            "day": "Dag 3",
+            "reference": "Job 38:1-5",
+            "theme": "God antwoordt niet door alles uit te leggen, maar door te laten zien wie Hij is."
+          },
+          {
+            "day": "Dag 4",
+            "reference": "Jesaja 53:1-10",
+            "theme": "De Knecht van de HEERE draagt zonde, ziekte en gebrokenheid."
+          },
+          {
+            "day": "Dag 5",
+            "reference": "Mattheus 6:25-34",
+            "theme": "De Vader weet wat je nodig hebt en roept je tot vertrouwen."
+          },
+          {
+            "day": "Dag 6",
+            "reference": "Romeinen 5:1-5",
+            "theme": "Lijden kan volharding, ervaring en hoop werken."
+          },
+          {
+            "day": "Dag 7",
+            "reference": "Romeinen 8:18-39",
+            "theme": "Niets kan scheiden van de liefde van God in Christus."
+          }
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_003_oneliners",
+      "type": "statement_response",
+      "title": "Dooddoeners over God en lijden",
+      "xp": 12,
+      "required": true,
+      "sort_order": 3,
+      "content": {
+        "intro": "Bij lijden worden soms snelle zinnen gezegd die logisch klinken, maar iemand ook pijn kunnen doen of God verkeerd voorstellen.",
+        "prompt": "Swipe door de dooddoeners. Kies er een en vul aan na de dubbele punt: wat klopt er niet, wat moet genuanceerd worden, of wat zou jij pastoraler zeggen?",
+        "statements": [
+          "Alles gebeurt met een reden, dus je moet dit gewoon accepteren",
+          "Als je genoeg gelooft, komt het vanzelf goed",
+          "God geeft je nooit meer dan je aankunt",
+          "Dit zal dan wel Gods bedoeling zijn geweest",
+          "Je moet niet vragen waarom, je moet gewoon vertrouwen",
+          "Als God echt goed was, had Hij dit voorkomen",
+          "Het is nu eenmaal je lot, je kunt er niets aan veranderen"
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_003_bible_psalm23",
+      "type": "bible",
+      "title": "Bijbel: Psalm 23",
+      "xp": 10,
+      "required": true,
+      "sort_order": 4,
+      "content": {
+        "reference": "Psalm 23",
+        "translation": "HSV",
+        "intro": "David weet wat lijden, gevaar en schaduw zijn. Toch spreekt hij over Gods goedheid. Lees Psalm 23 als een psalm van vertrouwen midden in kwetsbaarheid.",
+        "highlight": [
+          "Psalm 23:4",
+          "Psalm 23:6"
+        ],
+        "questions": [
+          "Welke woorden passen volgens jou bij Davids ervaring: mooi, onbegrijpelijk, kortzichtig, herkenbaar, uitzonderlijk of anders?",
+          "Welke vraag zou jij aan David willen stellen over het lijden dat hij meemaakt?",
+          "Wat zou David volgens jou antwoorden als hij zegt: de HEERE is mijn Herder?"
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_003_tension_distribution",
+      "type": "distribution",
+      "title": "Waar zit de spanning?",
+      "xp": 8,
+      "required": true,
+      "sort_order": 5,
+      "content": {
+        "prompt": "Verdeel 100 procent over wat voor jou het moeilijkst is bij Gods voorzienigheid.",
+        "total": 100,
+        "unit": "%",
+        "step": 5,
+        "allow_manual_input": true,
+        "options": [
+          {
+            "id": "macht",
+            "label": "Gods macht",
+            "description": "Als God alles kan, waarom grijpt Hij niet in?",
+            "default": 25
+          },
+          {
+            "id": "kwaad",
+            "label": "Macht van het kwaad",
+            "description": "Waarom krijgt kwaad zoveel ruimte?",
+            "default": 25
+          },
+          {
+            "id": "verantwoordelijkheid",
+            "label": "Menselijke verantwoordelijkheid",
+            "description": "Wat betekenen mijn keuzes dan nog?",
+            "default": 25
+          },
+          {
+            "id": "vertrouwen",
+            "label": "Vertrouwen",
+            "description": "Kan ik God vertrouwen als ik Hem niet begrijp?",
+            "default": 25
+          }
+        ],
+        "after_prompt": "Leg in een paar zinnen uit waarom je juist zo verdeeld hebt.",
+        "share_with_group": true,
+        "show_group_after_submit": true
+      }
+    },
+    {
+      "id": "belijdenis_003_what_we_believe",
+      "type": "deep_dive",
+      "title": "Wat geloven we?",
+      "xp": 15,
+      "required": true,
+      "sort_order": 6,
+      "content": {
+        "summary": "Voorzienigheid betekent niet dat God alleen vooraf weet wat er gaat gebeuren. Het gaat om Gods zorg: Hij onderhoudt, regeert en leidt zijn wereld naar zijn doel.",
+        "callout": "Toeval is niet de diepste waarheid. De wereld en jouw leven zijn in Gods hand, ook wanneer je zijn weg niet begrijpt.",
+        "sections": [
+          {
+            "title": "Voorzienigheid is zorg",
+            "body": "Met voorzienigheid bedoelen we dat God niet alleen ooit de wereld heeft geschapen en haar daarna heeft losgelaten. Hij onderhoudt wat Hij maakte en regeert wat gebeurt. Dat betekent niet dat alles makkelijk te begrijpen is. Het betekent wel dat er bij God niets per ongeluk uit zijn hand glipt. De geschiedenis heeft een doel: Gods toekomst, de vernieuwing van hemel en aarde."
+          },
+          {
+            "title": "Ook de moeilijke dingen",
+            "body": "Romeinen 8 zegt dat alle dingen meewerken ten goede voor wie God liefhebben. Dat is geen goedkope zin waarmee je verdriet wegduwt. Het betekent dat zelfs het moeilijke niet sterker is dan Gods plan. De Bijbel leert ons niet om kwaad goed te praten, maar om te geloven dat God groter is dan het kwaad en zijn weg gaat naar herstel."
+          },
+          {
+            "title": "De Vader om Christus' wil",
+            "body": "De grote vraag is: wat zegt dit over God? Maakt voorzienigheid Hem hard? De Catechismus wijst naar Christus. De God die alles in zijn hand heeft, is de Vader van onze Heere Jezus Christus. Hij gaf zijn Zoon, bleef niet op afstand, en kwam in onze gebrokenheid om te vergeven en te helen. Daarom mag je over Gods bestuur niet spreken alsof Hij kil of wreed is."
+          },
+          {
+            "title": "Verantwoordelijkheid blijft echt",
+            "body": "Als God zorgt, maakt het dan nog uit wat jij doet? De Bijbel houdt twee dingen bij elkaar: God regeert, en mensen zijn verantwoordelijk. Gods zorg neemt onze zorg niet weg. Veel pijn in de wereld hangt samen met menselijke schuld, verkeerde keuzes, oorlog, onrecht en omgaan met de schepping. Juist omdat je leven van God is, doen je keuzes ertoe."
+          }
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_003_trust_questions",
+      "type": "deep_dive",
+      "title": "Vertrouwen en vragen",
+      "xp": 12,
+      "required": true,
+      "sort_order": 7,
+      "content": {
+        "summary": "Niet alles is verklaarbaar. Er is kwaad dat ons begrip te boven gaat. De Bijbel leert daarom niet alleen antwoorden, maar ook vertrouwen, klagen en buigen voor God.",
+        "callout": "Uiteindelijk stelt het lijden je de vraag: durf je te geloven in een God die je niet begrijpt?",
+        "sections": [
+          {
+            "title": "Niet alles sluitend verklaren",
+            "body": "Er blijven dingen die buiten onze verantwoordelijkheid lijken te liggen, zoals rampen, ziekte en verlies. Daar kun je iets over zeggen, maar je kunt het niet dichtredeneren. Als je alles te snel uitlegt, doe je vaak geen recht aan het verdriet. Voorzienigheid vraagt daarom eerbied: God is God, en wij zijn mensen."
+          },
+          {
+            "title": "Job mag vragen stellen",
+            "body": "Job klaagt, vraagt en wordt zelfs boos. Zijn vrienden vinden dat schokkend, maar God neemt Job uiteindelijk serieus. Dat leert ons dat je je vragen niet hoeft te verstoppen. Je mag eerlijk zijn tegenover de HEERE. Hij valt niet om van jouw vragen."
+          },
+          {
+            "title": "God ziet meer dan wij",
+            "body": "Aan het einde moet Job ook leren luisteren. God confronteert hem niet met een schema, maar met zijn grootheid. Dat kan pijnlijk zijn, maar ook bevrijdend: misschien ziet God meer dan wij. Misschien kan Hij wegen gaan die wij niet kunnen overzien. Vertrouwen is niet alles begrijpen, maar je toevertrouwen aan Hem die groter is."
+          },
+          {
+            "title": "Niet het lot",
+            "body": "Het alternatief voor Gods voorzienigheid is vaak niet rustiger. Als God er niets mee te maken heeft, blijft toeval of lot over. Dan is er geen Vader, geen doel en geen belofte dat God kwaad ten goede kan keren. De christelijke hoop zegt niet dat vragen verdwijnen, maar wel dat je niet aan het lot bent overgeleverd."
+          }
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_003_community",
+      "type": "group_discussion",
+      "title": "In de gemeente",
+      "xp": 9,
+      "required": true,
+      "sort_order": 8,
+      "content": {
+        "summary": "Bij dit thema hebben we getuigenissen nodig, maar ook ruimte voor vragen. De gemeente is een plek om samen te zoeken, te bidden en elkaar vast te houden.",
+        "prompt": "Hoe kan de gemeente een plek zijn van eerlijkheid en hoop in moeilijke tijden?",
+        "discussion_questions": [
+          "Ken je verhalen van mensen die veel meemaakten en toch getuigden: de HEERE liet mij niet los?",
+          "Is er in de gemeente genoeg ruimte voor twijfel, vragen en donkerte?",
+          "Hoe ervaar jij de manier waarop jouw gemeente omgaat met moeilijke tijden?",
+          "Hoe kun jij er zijn voor iemand die lijdt: getuigen, vragen stellen, bidden, luisteren of gewoon meelopen?"
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_003_comfort_hope",
+      "type": "deep_dive",
+      "title": "Hoe kan ik het uitleggen?",
+      "xp": 12,
+      "required": true,
+      "sort_order": 9,
+      "content": {
+        "summary": "Voorzienigheid uitleggen begint niet met iemand overtuigen, maar met laten zien wat voor troost en hoop het geeft dat God nabij is.",
+        "sections": [
+          {
+            "title": "Troost",
+            "body": "Je kunt iemand niet dwingen om de voorzienigheid te geloven. Wel kun je vertellen waarom het voor jou kostbaar is dat je leven in Gods hand ligt. Veel psalmen en liederen doen dat: ze maken grote woorden klein door persoonlijk te spreken. Wat een troost als je mag weten dat niets je kan scheiden van de liefde van Christus."
+          },
+          {
+            "title": "Getuigenis",
+            "body": "Persoonlijke verhalen kunnen helpen. Niet als bewijs dat alles makkelijk wordt, maar als getuigenis dat God ook in moeilijke momenten nabij was. Zulke verhalen moeten eerlijk blijven: soms ervaar je God niet, en toch kan later blijken dat Hij je niet losliet."
+          },
+          {
+            "title": "Hoop",
+            "body": "Iedereen zoekt houvast. De Bijbel geeft hoop omdat God dezelfde blijft. Romeinen 5 tekent een weg: lijden kan volharding werken, volharding ervaring, en ervaring hoop. Dat betekent: God was er toen; Hij zal er ook morgen zijn. Hoop is niet optimisme, maar vertrouwen op Gods trouw."
+          },
+          {
+            "title": "Een Vader bij wie je terecht kunt",
+            "body": "Er blijven vragen. Maar is het niet bijzonder dat je met je hele hart en leven terecht kunt bij een Vader? Voorzienigheid is geen koude formule. Het is belijden dat de Vader van Christus ook jouw leven draagt."
+          }
+        ],
+        "callout": "Niets in je leven gebeurt voor niets, en niets kan je scheiden van de liefde van Christus."
+      }
+    },
+    {
+      "id": "belijdenis_003_catechism",
+      "type": "deep_dive",
+      "title": "Belijdenisgeschrift: Zondag 9",
+      "xp": 12,
+      "required": true,
+      "sort_order": 10,
+      "content": {
+        "summary": "De Heidelbergse Catechismus vat Gods voorzienigheid samen door drie woorden bij elkaar te houden: Schepper, Vader en vertrouwen.",
+        "sections": [
+          {
+            "title": "God is Schepper",
+            "body": "Zondag 9 belijdt dat de Vader van onze Heere Jezus Christus hemel en aarde uit niets heeft geschapen. Alles wat bestaat, hangt niet aan zichzelf. God heeft het gemaakt en onderhoudt het nog steeds."
+          },
+          {
+            "title": "God is Vader om Christus' wil",
+            "body": "De Catechismus spreekt niet alleen over een almachtige Schepper, maar over mijn God en mijn Vader om Christus' wil. Dat is belangrijk. Gods macht wordt niet losgemaakt van zijn vaderlijke trouw in Christus."
+          },
+          {
+            "title": "God zorgt voor lichaam en ziel",
+            "body": "Daarom mag een gelovige vertrouwen dat God geeft wat nodig is voor lichaam en ziel. Dat betekent niet dat er geen kwaad overkomt. Wel belijdt de Catechismus dat God zelfs kwaad in dit tranendal ten goede kan keren."
+          },
+          {
+            "title": "Almachtig en getrouw",
+            "body": "De troost zit in de combinatie: God kan zorgen, want Hij is almachtig; God wil zorgen, want Hij is een getrouw Vader. Zonder almacht zou Hij misschien wel willen maar niet kunnen. Zonder trouw zou Hij misschien kunnen maar niet willen. In Christus mag je beide belijden."
+          }
+        ],
+        "questions": [
+          "Welk woord zou jij in dit antwoord als kernwoord onderstrepen?",
+          "Hoe klinkt het woord Vader als je God niet als Vader kent?",
+          "Kun je dan nog iets met voorzienigheid?"
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_003_talk_about",
+      "type": "group_discussion",
+      "title": "Om over door te praten",
+      "xp": 9,
+      "required": true,
+      "sort_order": 11,
+      "content": {
+        "prompt": "Rond af door eerlijk te spreken over vertrouwen, kwaad en verantwoordelijkheid.",
+        "discussion_questions": [
+          "Waarom zou je kunnen vertrouwen in een God die je niet begrijpt? Noem een paar redenen.",
+          "Als je spreekt over lijden, moet je het hebben over Gods macht, de macht van het kwaad en de verantwoordelijkheid van de mens. Waarom zou God de macht van het kwaad en menselijke verantwoordelijkheid nog zoveel ruimte geven?",
+          "Wat is het verschil tussen geloven in Gods voorzienigheid en geloven in het lot?",
+          "Welke zin uit dit hoofdstuk zou jij willen onthouden als je zelf door een moeilijke tijd gaat?"
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_003_promise",
+      "type": "promise",
+      "title": "Wat neem je mee?",
+      "xp": 12,
+      "required": true,
+      "sort_order": 12,
+      "content": {
+        "intro": "Schrijf per vraag een echte zin. Je antwoord verschijnt op het groepsbord.",
+        "min_characters": 25,
+        "prompts": [
+          "Ik begrijp nog niet",
+          "Ik vertrouw op God omdat",
+          "Ik wil er voor iemand zijn door"
+        ]
+      }
+    }
+  ]
+}

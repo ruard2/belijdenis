@@ -1,0 +1,320 @@
+{
+  "id": "belijdenis_001",
+  "course_id": "belijdenis",
+  "slug": "ik-geloof-in-god",
+  "title": "Ik geloof in God",
+  "subtitle": "Over God leren kennen",
+  "description": "Leerlingen onderzoeken hoe je God leert kennen: via gevoel, verstand, de Bijbel, Jezus Christus, de gemeente en persoonlijke omgang met Hem.",
+  "xp": 125,
+  "status": "published",
+  "sort_order": 1,
+  "blocks": [
+    {
+      "id": "belijdenis_001_hero",
+      "type": "hero",
+      "title": "Ik geloof in God",
+      "xp": 0,
+      "required": true,
+      "sort_order": 1,
+      "content": {
+        "subtitle": "Over God leren kennen",
+        "question": "Waarom zeg jij: ik geloof in God? Waarop is dat geloof gebaseerd?",
+        "body": "Stel je voor: op de markt staat iemand met de boodschap dat hij in een minuut kan bewijzen dat God bestaat. Dat klinkt aantrekkelijk, maar geloof werkt niet zo simpel. Dit hoofdstuk helpt je ontdekken hoe God zich laat kennen.",
+        "image_url": ""
+      }
+    },
+    {
+      "id": "belijdenis_001_reading_plan",
+      "type": "reading_plan",
+      "title": "Leesrooster",
+      "xp": 12,
+      "required": false,
+      "sort_order": 2,
+      "content": {
+        "intro": "Deze week gaat over de vraag hoe God zich laat kennen: in zijn Woord, in de schepping, in zijn oordeel over ongeloof en vooral in Christus.",
+        "focus": "Lees elke dag een gedeelte. Let erop hoe de Bijbel niet alleen over God spreekt, maar je ook voor Gods aangezicht zet.",
+        "readings": [
+          {
+            "day": "Dag 1",
+            "reference": "Deuteronomium 6:4-15",
+            "theme": "De ene HEERE liefhebben met hart, ziel en kracht."
+          },
+          {
+            "day": "Dag 2",
+            "reference": "Psalm 14",
+            "theme": "Ongeloof is niet alleen een idee, maar raakt het hart."
+          },
+          {
+            "day": "Dag 3",
+            "reference": "Psalm 19:1-15",
+            "theme": "De schepping spreekt en Gods Woord maakt wijs."
+          },
+          {
+            "day": "Dag 4",
+            "reference": "Jesaja 40:18-31",
+            "theme": "God is met niemand te vergelijken en geeft kracht."
+          },
+          {
+            "day": "Dag 5",
+            "reference": "Kolossenzen 1:1-8",
+            "theme": "Geloof, hoop en liefde groeien door het evangelie."
+          },
+          {
+            "day": "Dag 6",
+            "reference": "Kolossenzen 1:9-14",
+            "theme": "God kennen wordt zichtbaar in een leven dat vrucht draagt."
+          },
+          {
+            "day": "Dag 7",
+            "reference": "Kolossenzen 1:15-23",
+            "theme": "In Christus zien we de onzichtbare God."
+          }
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_001_slider",
+      "type": "distribution",
+      "title": "Bewijzen dat God bestaat?",
+      "xp": 8,
+      "required": true,
+      "sort_order": 3,
+      "content": {
+        "prompt": "Verdeel 100 procent over de basis van jouw geloof in God.",
+        "total": 100,
+        "unit": "%",
+        "step": 5,
+        "allow_manual_input": true,
+        "options": [
+          {
+            "id": "gevoel",
+            "label": "Gevoel",
+            "description": "Wat ik ervaar",
+            "default": 35
+          },
+          {
+            "id": "verstand",
+            "label": "Verstand",
+            "description": "Wat ik weet of begrijp",
+            "default": 30
+          },
+          {
+            "id": "bijbel",
+            "label": "De Bijbel",
+            "description": "Openbaring door God zelf",
+            "default": 35
+          }
+        ],
+        "after_prompt": "Wat valt je op aan jouw verdeling?",
+        "share_with_group": true,
+        "show_group_after_submit": true
+      }
+    },
+    {
+      "id": "belijdenis_001_bible_johannes",
+      "type": "bible",
+      "title": "Bijbel: Johannes 1:1-18",
+      "xp": 14,
+      "required": true,
+      "sort_order": 4,
+      "content": {
+        "reference": "Johannes 1:1-18",
+        "translation": "HSV",
+        "intro": "Johannes schrijft niet alsof Gods bestaan eerst bewezen moet worden. Hij getuigt van het Woord, van Jezus Christus, opdat mensen door dat getuigenis leren geloven.",
+        "highlight": [
+          "Johannes 1:18"
+        ],
+        "questions": [
+          "Hoe zou jij Johannes' antwoord samenvatten op de vraag hoe je kunt weten dat God bestaat?",
+          "Welke tekst in dit gedeelte getuigt voor jou het duidelijkst van God?",
+          "Wat zegt dit gedeelte jou over wie God is?"
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_001_case_niels",
+      "type": "group_discussion",
+      "title": "Casus Niels",
+      "xp": 12,
+      "required": true,
+      "sort_order": 5,
+      "content": {
+        "case_text": "Niels wordt op zijn werk uitgedaagd door een collega: hoe weet je eigenlijk zeker dat God bestaat, en maakt geloven verschil? Hij merkt dat hij die vragen zelf ook herkent.",
+        "prompt": "Wat zou jij tegen Niels zeggen zonder de vraag weg te duwen?",
+        "discussion_questions": [
+          "Waarom kun je de vraag naar Gods bestaan niet zomaar negeren?",
+          "Wat is het verschil tussen geloven dat God bestaat en leven met God?",
+          "Welke woorden zou jij gebruiken in een gesprek met een niet-gelovige?"
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_001_feeling_reason",
+      "type": "deep_dive",
+      "title": "Gevoel en verstand",
+      "xp": 10,
+      "required": true,
+      "sort_order": 6,
+      "content": {
+        "summary": "De vraag of God bestaat kun je niet zomaar wegduwen. Gevoel en verstand doen echt mee, maar ze dragen het geloof niet alleen. God maakt zichzelf bekend in de schepping en nog duidelijker in zijn Woord.",
+        "callout": "Geloven gaat boven ons verstand uit, maar is niet onredelijk. De schepping wijst naar God; de Schrift laat Hem spreken.",
+        "sections": [
+          {
+            "title": "De vraag van Niels",
+            "body": "Niels krijgt op zijn werk de vraag of hij zeker weet dat God bestaat. Dat raakt hem, omdat hij merkt dat hij zelf ook zoekt naar woorden. Die vraag hoef je niet weg te duwen. In onze tijd is ongeloof voor veel mensen normaal geworden. Juist daarom is het goed om eerlijk te leren antwoorden. Tegelijk is zeggen dat God bestaat nog niet hetzelfde als God kennen. Je kunt weten dat iemand bestaat zonder met die persoon te leven. Bij God gaat het dieper: als Hij de levende God is, roept Hij je tot vertrouwen, bekering en omgang met Hem."
+          },
+          {
+            "title": "Gevoel en verstand doen mee",
+            "body": "Je gevoel kan iets aanwijzen: verwondering, ontzag, schuld, vreugde of verlangen. Ook je verstand doet mee. De orde en schoonheid van de wereld maken het niet vreemd om aan een Schepper te denken. Geloven vraagt dus niet dat je je gevoel of verstand uitschakelt. Maar gevoel wisselt, en verstand kan trots worden of vastlopen. Daarom zijn gevoel en verstand belangrijk, maar niet de grond waarop je geloof rust. Ze moeten leren luisteren naar wat God zelf bekendmaakt."
+          },
+          {
+            "title": "De schepping als boek",
+            "body": "De Nederlandse Geloofsbelijdenis zegt dat wij God kennen door de schepping, onderhouding en regering van de wereld. Die wereld is voor onze ogen als een prachtig boek, waarin alle schepselen als letters zijn. Een boom, een baby, je ademhaling, sterren, seizoenen en schoonheid spellen iets van Gods eeuwige kracht en goddelijkheid. Psalm 19 zingt hetzelfde: de hemel vertelt Gods eer. Maar Psalm 19 gaat daarna verder naar Gods wet, die de ziel verkwikt. De schepping wijst naar God; de Schrift maakt zijn stem duidelijk."
+          },
+          {
+            "title": "Hij zoekt ontmoeting",
+            "body": "Als je God echt wilt leren kennen, moet je bij de Bijbel zijn. Voordat jij over God nadenkt, spreekt Hij al tot jou. In de Bijbel zoekt God ontmoeting, niet alleen discussie. Daarom moet je beeld van God steeds getoetst worden aan zijn Woord. Misschien voelt God voor jou streng, vaag, warm, ver weg of vanzelfsprekend. De vraag is: klopt dat met hoe Hij zichzelf laat kennen? Door de Schrift richt de Heilige Geest je ogen op Christus. In Hem leer je God werkelijk kennen."
+          }
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_001_meeting",
+      "type": "text",
+      "title": "Hij zoekt ontmoeting",
+      "xp": 8,
+      "required": true,
+      "sort_order": 7,
+      "content": {
+        "body": "God leer je niet kennen door alleen over Hem te redeneren. In de Bijbel spreekt God zelf. Hij zoekt ontmoeting, zodat je Hem leert kennen. De schepping wijst naar zijn grootheid, maar in zijn Woord spreekt Hij duidelijk. Daarom wordt je beeld van God steeds getoetst aan de Bijbel, en vooral aan Jezus Christus, in wie God zichzelf bekendmaakt.",
+        "questions": [
+          "Waar merk jij dat je beeld van God gevormd wordt?",
+          "Durf je je beeld van God te laten corrigeren door de Bijbel?",
+          "Wat betekent het dat Jezus God bekendmaakt?"
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_001_community",
+      "type": "group_discussion",
+      "title": "In de gemeente",
+      "xp": 9,
+      "required": true,
+      "sort_order": 8,
+      "content": {
+        "summary": "God leren kennen is persoonlijk, maar niet individualistisch. Ouders, vrienden, school, catechese en vooral de gemeente kunnen middelen zijn waardoor je God beter leert kennen. Samen met alle heiligen leer je meer zien van de liefde van Christus.",
+        "prompt": "We hebben elkaar nodig om God beter te leren kennen.",
+        "discussion_questions": [
+          "Kun je een voorbeeld noemen van iets dat je van andere gelovigen hebt geleerd?",
+          "Wat hoop of verwacht jij van de belijdeniscatechese?"
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_001_trinity",
+      "type": "deep_dive",
+      "title": "God is drie-enig",
+      "xp": 11,
+      "required": true,
+      "sort_order": 9,
+      "content": {
+        "summary": "Johannes 1 spreekt over God en over de Zoon. De Bijbel spreekt ook over de Geest. De kerk heeft deze bijbelse gegevens eerbiedig onder woorden gebracht als de drie-eenheid.",
+        "sections": [
+          {
+            "title": "Niet een rekensom",
+            "body": "De drie-eenheid is niet bedoeld als hogere wiskunde. De kerk heeft dit niet bedacht om geloof ingewikkeld te maken, maar heeft geluisterd naar de Bijbel. De Vader spreekt, de Zoon wordt mens, de Geest daalt neer. Jezus bidt tot de Vader en belooft de Geest. Bij de doop klinkt de ene Naam van Vader, Zoon en Heilige Geest. Geloven betekent hier niet dat je stopt met denken, maar dat je leert denken met eerbied: God past niet in ons hoofd."
+          },
+          {
+            "title": "Het werk dat zij doen",
+            "body": "De Nederlandse Geloofsbelijdenis helpt door de drie Personen te onderscheiden naar hun werk. De Vader is onze Schepper door zijn kracht. De Zoon is onze Heiland en Verlosser door zijn bloed. De Heilige Geest is onze Heiligmaker, omdat Hij in ons hart woont. Dat maakt de drie-eenheid concreet. God blijft niet op afstand: Hij schept, verlost en vernieuwt. Zonder de echte Godheid van de Zoon en de Geest zou het evangelie zijn kracht verliezen."
+          },
+          {
+            "title": "God boven, naast en in ons",
+            "body": "Je kunt het eenvoudig onthouden zonder het plat te maken: de Vader is God boven ons, de Zoon is God naast ons, de Geest is God in ons. De Vader geeft je leven en onderhoudt alles. De Zoon komt zo dichtbij dat Hij ons vlees aanneemt en aan het kruis gaat. De Geest komt zo dichtbij dat Hij overtuigt, troost, leert bidden en liefde tot Christus werkt. Zo is God niet vaag, maar rijk persoonlijk."
+          },
+          {
+            "title": "Wie is Hij?",
+            "body": "Zeggen dat God drie-enig is kan afstandelijk klinken. Maar als je iemand echt wilt leren kennen, wil je weten wie hij is en hoe hij handelt. Zo is het ook met God. Je leert Hem niet kennen door alleen definities te herhalen, maar door omgang met Hem bij een open Bijbel. Daar ontmoet je Jezus Christus, de Zoon van God. Door de Heilige Geest worden je ogen op Hem gericht. Wie de Zoon leert kennen, leert ook de Vader kennen."
+          }
+        ],
+        "callout": "De drie-eenheid is geen rekensom om God klein te krijgen, maar eerbiedige taal om na te spreken wat God van zichzelf laat zien."
+      }
+    },
+    {
+      "id": "belijdenis_001_trinity_video",
+      "type": "youtube",
+      "title": "Filmpje: God is drie-enig",
+      "xp": 5,
+      "required": false,
+      "sort_order": 10,
+      "content": {
+        "intro": "Bekijk dit korte filmpje als extra hulp bij de vraag hoe christenen spreken over Vader, Zoon en Heilige Geest.",
+        "url": "https://www.youtube.com/watch?v=eAvYmE2YYIU",
+        "questions": [
+          "Welke uitleg uit het filmpje helpt jou het meest?",
+          "Welke vraag over de drie-eenheid blijft voor jou staan?"
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_001_who_is_he",
+      "type": "text",
+      "title": "Wie is Hij?",
+      "xp": 8,
+      "required": true,
+      "sort_order": 11,
+      "content": {
+        "body": "Als je iemand echt wilt leren kennen, wil je weten wie die persoon is. Zo is het ook met God. Door de omgang met God, bij een open Bijbel, leer je Hem werkelijk kennen. In Jezus Christus ontmoet je de Zoon, en door Hem leer je ook de Vader kennen.",
+        "references": [
+          "Johannes 1:18",
+          "Kolossenzen 1:15"
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_001_other_religions",
+      "type": "text",
+      "title": "Andere godsdiensten",
+      "xp": 8,
+      "required": true,
+      "sort_order": 12,
+      "content": {
+        "body": "Andere godsdiensten laten zien dat mensen zoeken naar meer dan wat zichtbaar is. Tegelijk belijdt het christelijk geloof dat God zich beslissend bekendmaakt in Jezus Christus. Zonder Hem blijft godskennis op afstand.",
+        "questions": [
+          "Hoe kun je respectvol spreken met mensen uit andere godsdiensten?",
+          "Waarom is Jezus volgens het christelijk geloof beslissend voor het kennen van God?"
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_001_personal_knowledge",
+      "type": "reflection",
+      "title": "Persoonlijke kennis",
+      "xp": 10,
+      "required": true,
+      "sort_order": 13,
+      "content": {
+        "prompt": "God kennen is niet alleen feitenkennis. Wat betekent het voor jou dat het gaat om kennis van je Heiland?",
+        "placeholder": "Schrijf je gedachte op...",
+        "visibility": "private"
+      }
+    },
+    {
+      "id": "belijdenis_001_promise",
+      "type": "promise",
+      "title": "Wat neem je mee?",
+      "xp": 10,
+      "required": true,
+      "sort_order": 14,
+      "content": {
+        "prompts": [
+          "Wat heb ik geleerd over God kennen?",
+          "Welke vraag wil ik verder bespreken?",
+          "Wat neem ik mee in gebed of praktijk?"
+        ],
+        "intro": "Schrijf per vraag een echte zin. Je antwoord verschijnt op het groepsbord.",
+        "min_characters": 25
+      }
+    }
+  ]
+}

@@ -1,0 +1,416 @@
+{
+  "id": "belijdenis_002",
+  "course_id": "belijdenis",
+  "slug": "de-wereld-is-van-god",
+  "title": "De wereld is van God",
+  "subtitle": "Over de schepping",
+  "description": "Leerlingen leren de wereld niet alleen als natuur te zien, maar als schepping: gave van de Vader, door het Woord, afhankelijk van zijn onderhoud. Ze oefenen verwondering, bespreken Psalm 8, verkennen schepping en evolutie zonder angst, en vertalen rentmeesterschap naar een concrete levenshouding.",
+  "xp": 125,
+  "status": "published",
+  "sort_order": 2,
+  "blocks": [
+    {
+      "id": "belijdenis_002_hero",
+      "type": "hero",
+      "title": "De wereld is van God",
+      "xp": 0,
+      "required": true,
+      "sort_order": 1,
+      "content": {
+        "subtitle": "Over schepping, verwondering en verantwoordelijkheid",
+        "image_url": "",
+        "question": "Wanneer werd jij voor het laatst echt stil van iets in Gods wereld?",
+        "body": "Dit hoofdstuk begint niet met een discussie, maar met kijken. Een bergwand, een sterrenhemel, een kind, een bloem, een branding, je eigen adem: de Bijbel leert je om de wereld niet als toeval of bezit te zien, maar als schepping. Deze wereld is van God. Daarom mag je je verwonderen, maar word je ook op je plek gezet: als schepsel, als beeld van God en als rentmeester."
+      }
+    },
+    {
+      "id": "belijdenis_002_reading_plan",
+      "type": "reading_plan",
+      "title": "Leesrooster",
+      "xp": 14,
+      "required": false,
+      "sort_order": 2,
+      "content": {
+        "intro": "Deze week lees je hoe de Bijbel spreekt over schepping, verwondering, Gods zorg en de plaats van de mens. De lezingen bouwen op: eerst Genesis, dan Psalm 8, daarna lofzang, storm en de vraag wat mensen met Gods openbaring doen.",
+        "focus": "Let elke dag op drie dingen: wat zegt dit over God, wat zegt dit over de mens, en waartoe roept dit gedeelte jou?",
+        "readings": [
+          {
+            "day": "Dag 1",
+            "reference": "Genesis 1:1-19",
+            "theme": "God spreekt licht, ruimte, ritme en leven tevoorschijn."
+          },
+          {
+            "day": "Dag 2",
+            "reference": "Genesis 1:20-2:3",
+            "theme": "De mens komt laat, krijgt waardigheid en wordt direct in Gods rust geplaatst."
+          },
+          {
+            "day": "Dag 3",
+            "reference": "Psalm 8:1-10",
+            "theme": "De hemel maakt je klein, maar God geeft mensen toch een hoge roeping."
+          },
+          {
+            "day": "Dag 4",
+            "reference": "Psalm 139:1-18",
+            "theme": "God kent jou als Maker persoonlijker dan jij jezelf kent."
+          },
+          {
+            "day": "Dag 5",
+            "reference": "Psalm 148",
+            "theme": "Heel de schepping wordt opgeroepen om de HEERE te loven."
+          },
+          {
+            "day": "Dag 6",
+            "reference": "Markus 4:35-41",
+            "theme": "Jezus spreekt met gezag over wind en water: de Schepper is ook Verlosser."
+          },
+          {
+            "day": "Dag 7",
+            "reference": "Romeinen 1:18-25",
+            "theme": "De schepping laat Gods kracht zien, maar mensen kunnen de Schepper toch inruilen."
+          }
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_002_bible_psalm8",
+      "type": "bible",
+      "title": "Bijbel: Psalm 8",
+      "xp": 12,
+      "required": true,
+      "sort_order": 3,
+      "content": {
+        "reference": "Psalm 8:1-10",
+        "translation": "HSV",
+        "intro": "Psalm 8 kijkt naar de hemel en daarna naar de mens. Je ziet tegelijk hoe groot God is en hoe klein jij bent. Toch geeft God mensen een plaats en een opdracht in zijn schepping.",
+        "questions": [
+          "Wat zegt deze psalm over de plaats van God in de schepping?",
+          "Wat zegt deze psalm over de plaats van de mens in de schepping?",
+          "Welke zin of gedachte raakt jou het meest: kleinheid, waardigheid, verantwoordelijkheid of lof?",
+          "Welke vraag zou jij bij deze psalm aan God willen stellen?"
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_002_gallery",
+      "type": "gallery",
+      "title": "Deel verwondering",
+      "xp": 8,
+      "required": true,
+      "sort_order": 4,
+      "content": {
+        "prompt": "Upload een foto of video van iets in de schepping dat jou raakt. Schrijf er een zin bij: wat zie je hierin van Gods grootheid, zorg of creativiteit?",
+        "allowed_media": [
+          "image",
+          "video"
+        ],
+        "visibility": "group"
+      }
+    },
+    {
+      "id": "belijdenis_002_impressive",
+      "type": "deep_dive",
+      "title": "Wat indrukwekkend!",
+      "xp": 10,
+      "required": true,
+      "sort_order": 5,
+      "content": {
+        "summary": "De schepping kan je stil maken. Maar verwondering blijft niet hangen bij schoonheid alleen. De Bijbel leert je door de schepping heen naar de Schepper te kijken.",
+        "callout": "De wereld is geen bunker waarin je opgesloten zit. Ze is van God, en zij wijst boven zichzelf uit.",
+        "sections": [
+          {
+            "title": "Sterren, zee en geboorte",
+            "body": "Wie naar de sterrenhemel kijkt, merkt hoe klein hij is. Wie bij de zee staat, voelt kracht. Wie een pasgeboren kind ziet, kan bijna niet anders dan zich verwonderen. Zulke momenten bewijzen niet automatisch alles, maar ze openen wel een vraag: is deze werkelijkheid alleen stom toeval, of spreekt er iets van Gods grootheid doorheen?"
+          },
+          {
+            "title": "De schepping is niet God",
+            "body": "Christelijk geloven aanbidt de natuur niet. Een bloem, dier, planeet of lichaam is geen god. Maar ze zijn ook geen waardeloze dingen. Ze zijn schepselen. Daardoor kunnen ze iets laten zien van Gods wijsheid, macht, zorg en schoonheid. Wie alleen naar de natuur kijkt, leert God nog niet persoonlijk kennen. Daarvoor heb je zijn Woord nodig. Maar de schepping roept wel: kijk verder."
+          },
+          {
+            "title": "Geen bunker",
+            "body": "Als de wereld alleen maar een gesloten systeem is, zit je opgesloten tussen toeval, natuurwetten en menselijke keuzes. Genesis opent de ramen: de wereld is van God. Je leven hangt niet los in het niets. Jij bent niet alleen een toevallig organisme, maar een schepsel voor Gods aangezicht. Dat maakt je klein, vrij en verantwoordelijk tegelijk."
+          },
+          {
+            "title": "Lofzang, geen schema",
+            "body": "Genesis 1 hoef je niet te behandelen alsof het een natuurkundeboek is. Het is ook niet bedoeld als koud bewijsstuk in een debat. Genesis 1 is allereerst een machtige lofzang op Gods daden: Hij spreekt, ordent, geeft leven, geeft plaats en noemt zijn werk goed. De vraag is dus niet alleen: hoe ging het precies? Maar ook: Wie staat aan het begin en wat betekent dat voor mij?"
+          }
+        ],
+        "references": [
+          "Genesis 1:1",
+          "Psalm 8:2",
+          "Psalm 19:1-4",
+          "Romeinen 1:20"
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_002_place",
+      "type": "group_discussion",
+      "title": "Op je plek",
+      "xp": 8,
+      "required": true,
+      "sort_order": 6,
+      "content": {
+        "summary": "In Genesis komt de mens niet als eerste, maar bijna aan het einde. Dat zet ons op onze plek: de wereld bestaat niet dankzij ons. Toch krijgt de mens een bijzondere waardigheid, want hij is geschapen naar Gods beeld.",
+        "prompt": "Wat doet het met je als je tegelijk klein en waardevol bent?",
+        "discussion_questions": [
+          "Waarin merk jij dat mensen afhankelijk zijn van de schepping?",
+          "Waarin merk jij dat mensen niet zonder God kunnen?",
+          "Wat betekent het volgens jou dat de mens naar Gods beeld is geschapen?",
+          "Wanneer wordt rentmeesterschap concreet in jouw leven: thuis, school, geld, schermgebruik, eten of natuur?"
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_002_sorting",
+      "type": "sorting",
+      "title": "God, mens en schepping",
+      "xp": 8,
+      "required": true,
+      "sort_order": 7,
+      "content": {
+        "prompt": "Sleep de woorden naar de juiste categorie en bespreek daarna waarom sommige woorden bij elkaar horen. Let op: de Bijbel zet God, mens en schepping niet los naast elkaar, maar in verhouding tot elkaar.",
+        "categories": [
+          "God",
+          "Mens",
+          "Schepping"
+        ],
+        "items": [
+          {
+            "text": "Schepper",
+            "category": "God"
+          },
+          {
+            "text": "Onderhouder",
+            "category": "God"
+          },
+          {
+            "text": "Verlosser",
+            "category": "God"
+          },
+          {
+            "text": "Beeld van God",
+            "category": "Mens"
+          },
+          {
+            "text": "Rentmeester",
+            "category": "Mens"
+          },
+          {
+            "text": "Afhankelijk",
+            "category": "Mens"
+          },
+          {
+            "text": "Gave",
+            "category": "Schepping"
+          },
+          {
+            "text": "Goed gemaakt",
+            "category": "Schepping"
+          },
+          {
+            "text": "Niet goddelijk",
+            "category": "Schepping"
+          }
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_002_ngb12",
+      "type": "deep_dive",
+      "title": "Belijdenisgeschrift: NGB artikel 12",
+      "xp": 12,
+      "required": true,
+      "sort_order": 8,
+      "content": {
+        "summary": "De Nederlandse Geloofsbelijdenis artikel 12 helpt om meer te zeggen dan: God maakte ooit de wereld. Het artikel spreekt over scheppen, onderhouden, regeren en dienen.",
+        "callout": "God houdt zijn hand onder de wereld. Hij zorgt voor mensen, opdat mensen Hem dienen.",
+        "sections": [
+          {
+            "title": "De Vader schept door zijn Woord",
+            "body": "NGB artikel 12 belijdt dat de Vader hemel en aarde heeft geschapen door zijn Woord, dat is: door zijn Zoon. De schepping staat dus niet los van Christus. De God die redt, is ook de God die maakt. De God die spreekt in het evangelie, heeft ook gesproken aan het begin. Dat geeft een diepe eenheid: je hoeft de Schepper niet los te denken van de Verlosser."
+          },
+          {
+            "title": "Ieder schepsel krijgt een plaats",
+            "body": "De belijdenis zegt niet dat God een anonieme massa maakte. Elk schepsel ontvangt wezen, vorm, gestalte en een taak. Dat is mooi voor jongeren om te horen: jij bent niet willekeurig. Ook bloemen, dieren, seizoenen, water, licht en werk hebben hun plek. De schepping is geordend, niet omdat wij haar beheersen, maar omdat God haar wijs gemaakt heeft."
+          },
+          {
+            "title": "Onderhouding: elke morgen scheppingsdag",
+            "body": "Schepping gaat niet alleen over vroeger. God laat niet los wat zijn hand begon. Dat jij wakker wordt, ademt, eet, leert, lacht en leeft, staat niet buiten Hem om. De Bijbel noemt dat Gods zorg en onderhouding. Dat geeft troost wanneer je leven rommelig voelt: God houdt de draad vast, ook wanneer jij vooral losse eindjes ziet."
+          },
+          {
+            "title": "God dient, zodat wij dienen",
+            "body": "Een verrassende gedachte in NGB artikel 12 is dat God de schepping onderhoudt ten dienste van de mens, zodat de mens zijn God dient. Dat zet zorg voor de schepping in een helder kader. God geeft, wij ontvangen. God zorgt, wij antwoorden. God dient niet omdat Hij onze knecht is, maar omdat Hij goed is. Juist daarom is ons leven bedoeld als dankbare dienst aan Hem."
+          }
+        ],
+        "questions": [
+          "Welke zin of gedachte uit NGB artikel 12 vind jij waardevol?",
+          "Wat zou je missen als je niet geloofde dat God de wereld onderhoudt?",
+          "Welke vraag roept dit artikel bij jou op?"
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_002_bid_dankdag",
+      "type": "group_discussion",
+      "title": "In de gemeente: bid- en dankdag",
+      "xp": 8,
+      "required": true,
+      "sort_order": 9,
+      "content": {
+        "summary": "Bid- en dankdag helpen de gemeente om stil te staan bij Gods zorg voor het gewone leven: werk, eten, oogst, studie, lichaam, aarde en toekomst.",
+        "prompt": "Wat belijdt een gemeente eigenlijk wanneer zij bid- en dankdag houdt?",
+        "discussion_questions": [
+          "Hoe beleef jij bid- en dankdag: waardevol, gewoonte, vreemd, mooi of lastig?",
+          "Waarom is het goed om ook voor aardse en lichamelijke zorgen te bidden?",
+          "Zou verantwoord en duurzaam omgaan met de schepping een onderwerp voor bid- of dankdag mogen zijn?",
+          "Waarvoor zou jij dit jaar willen bidden of danken als het gaat om Gods schepping?"
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_002_evolution_cards",
+      "type": "statement_response",
+      "title": "Schepping en evolutie: waar schuurt het?",
+      "xp": 10,
+      "required": true,
+      "sort_order": 10,
+      "content": {
+        "intro": "Over schepping en evolutie denken christenen verschillend. Dit blok lost de hele discussie niet op. Het helpt je wel om scherp te krijgen wat je hoort, wat je vraagt en wat je als christen wilt vasthouden.",
+        "prompt": "Swipe door de zinnen. Kies er een die jou bezighoudt en vul aan: wat zou jij erbij willen vragen, nuanceren of vasthouden?",
+        "statements": [
+          "Genesis 1 moet je lezen als natuurkundeboek",
+          "Genesis 1 is alleen maar poëzie en zegt niets over werkelijkheid",
+          "Wetenschap maakt geloven in een Schepper overbodig",
+          "Als evolutie waar is, kan God geen Schepper zijn",
+          "Het belangrijkste is niet een theorie winnen, maar God als Schepper belijden",
+          "Oorsprongsvragen brengen iedereen aan de grenzen van zijn kennis",
+          "God buiten zijn schepping zetten, eert Hem niet"
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_002_evolution_deep",
+      "type": "deep_dive",
+      "title": "Eerbiedige houding",
+      "xp": 12,
+      "required": true,
+      "sort_order": 11,
+      "content": {
+        "summary": "Bij vragen over schepping en evolutie past geen paniek en geen gemakzucht. Je mag nadenken, onderzoeken en vragen stellen, maar met eerbied voor Gods Woord en met besef van je grenzen.",
+        "callout": "Wij hebben geen redder nodig die alleen gaten in onze kennis opvult, maar de levende God die Schepper van hemel en aarde is.",
+        "sections": [
+          {
+            "title": "Niet alles wordt hier opgelost",
+            "body": "De discussie over schepping en evolutie is groot. Er spelen vragen over Bijbellezen, wetenschap, tijd, dood, toeval, het beeld van God en Gods handelen. Een catecheseavond kan dat niet allemaal afronden. Wat wel beslissend is: geloof je dat God deze wereld geschapen heeft en dat Hij niet buiten zijn eigen schepping gezet mag worden?"
+          },
+          {
+            "title": "Evolutionisme is meer dan biologie",
+            "body": "Het is goed om onderscheid te maken. Over biologische processen kun je wetenschappelijk spreken. Maar evolutionisme als levensbeschouwing zegt meer: alles is uiteindelijk uit toeval en noodzaak ontstaan, zonder Schepper. Daar schuurt het christelijk geloof fundamenteel. Niet omdat christenen bang zijn voor vragen, maar omdat God dan uit zijn eigen wereld wordt weggedacht."
+          },
+          {
+            "title": "Ook ongelovige verklaringen hebben grenzen",
+            "body": "Oorsprongsvragen brengen iedereen aan grenzen. Waarom is er iets en niet niets? Waar komt orde, leven, bewustzijn, goedheid of schoonheid vandaan? Ook wie niet in God gelooft, kan niet eenvoudig alles verklaren. Dat maakt christenen niet arrogant, maar wel nuchter: elk mens leeft uiteindelijk met geloofsvooronderstellingen."
+          },
+          {
+            "title": "Kwetsbaar, maar niet los in de lucht",
+            "body": "Belijden dat God Schepper is, blijft kwetsbaar. Je kunt God niet in een reageerbuis bewijzen. Toch is geloof geen slag in de lucht. God maakt zichzelf bekend in zijn Woord. Genesis geeft je geen volledige technische beschrijving, maar wel houvast: God spreekt, de wereld is goed gemaakt, de mens is beeld van God, en alles is bedoeld tot zijn eer."
+          }
+        ]
+      }
+    },
+    {
+      "id": "belijdenis_002_heenwijzers",
+      "type": "distribution",
+      "title": "Wat wijst jou het meest naar God?",
+      "xp": 8,
+      "required": true,
+      "sort_order": 12,
+      "content": {
+        "prompt": "Verdeel 100 procent over wat jou het meest helpt om de wereld als schepping te zien.",
+        "total": 100,
+        "unit": "%",
+        "step": 5,
+        "allow_manual_input": true,
+        "options": [
+          {
+            "id": "schoonheid",
+            "label": "Schoonheid",
+            "description": "Sterren, bloemen, zee, muziek, orde en detail.",
+            "default": 25
+          },
+          {
+            "id": "afhankelijkheid",
+            "label": "Afhankelijkheid",
+            "description": "Adem, eten, lichaam, zorg en dagelijks brood.",
+            "default": 25
+          },
+          {
+            "id": "woord",
+            "label": "Gods Woord",
+            "description": "Genesis, Psalm 8 en het Bijbelse getuigenis.",
+            "default": 25
+          },
+          {
+            "id": "gemeente",
+            "label": "Gemeente en traditie",
+            "description": "Belijdenis, bid- en dankdag, samen danken.",
+            "default": 25
+          }
+        ],
+        "after_prompt": "Leg in een paar zinnen uit waarom je juist zo verdeeld hebt.",
+        "share_with_group": true,
+        "show_group_after_submit": true
+      }
+    },
+    {
+      "id": "belijdenis_002_challenge",
+      "type": "challenge",
+      "title": "Rentmeester challenge",
+      "xp": 8,
+      "required": true,
+      "sort_order": 13,
+      "content": {
+        "prompt": "Als de wereld van God is, is zorg voor de schepping geen hobby maar antwoord. Kies een concrete actie waarmee jij deze week laat zien: dit is niet van mij, dit is van de HEERE.",
+        "examples": [
+          "Ruim afval op in je straat of onderweg en doe het bewust als gebed: Heer, deze wereld is van U.",
+          "Koop of gebruik deze week een ding minder of bewuster. Noteer welk verlangen daarachter zit: gemak, status, verveling of dankbaarheid.",
+          "Neem tien minuten zonder scherm: kijk, dank, en benoem drie schepselen als letters die iets van God vertellen.",
+          "Bid concreet voor boeren, natuurbeheerders, mensen met zorgen om inkomen, en wijs omgaan met Gods wereld."
+        ],
+        "min_characters": 20
+      }
+    },
+    {
+      "id": "belijdenis_002_promise",
+      "type": "promise",
+      "title": "Wat neem je mee?",
+      "xp": 7,
+      "required": true,
+      "sort_order": 14,
+      "content": {
+        "prompts": [
+          "Ik heb geleerd over Gods schepping",
+          "Ik geloof over deze wereld",
+          "Ik wil deze week als rentmeester"
+        ],
+        "intro": "Schrijf per vraag een echte zin. Je antwoord verschijnt op het groepsbord.",
+        "min_characters": 25
+      }
+    },
+    {
+      "id": "belijdenis_002_leestip_weet",
+      "type": "text",
+      "title": "Leestip",
+      "xp": 0,
+      "required": false,
+      "sort_order": 15,
+      "content": {
+        "body": "Wil je op een toegankelijke manier verder lezen over geloof, schepping en wetenschap? Kijk eens op Weet Magazine. Je vindt er artikelen, vragen en achtergronden die helpen om verder na te denken. Wie er meer mee wil doen, kan ook het magazine of een abonnement bekijken.",
+        "callout": "Mooi voor thuis of voor later: kies één artikel dat je aanspreekt en neem één vraag mee naar de groep.",
+        "url": "https://weet-magazine.nl/",
+        "link_label": "Bezoek Weet Magazine"
+      }
+    }
+  ]
+}

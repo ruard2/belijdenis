@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Houvast Block",
+  "type": "object",
+  "required": ["id", "type", "title", "xp", "required", "sort_order", "content"],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "hero",
+        "text",
+        "reflection",
+        "bible",
+        "quiz",
+        "multiple_choice",
+        "slider",
+        "distribution",
+        "sorting",
+        "video",
+        "youtube",
+        "audio",
+        "media_player",
+        "gallery",
+        "deep_dive",
+        "tradition",
+        "personal",
+        "quote",
+        "group_discussion",
+        "challenge",
+        "upload",
+        "prayer",
+        "promise"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "xp": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "required": {
+      "type": "boolean"
+    },
+    "sort_order": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "content": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}
