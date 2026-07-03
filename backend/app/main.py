@@ -29,7 +29,24 @@ from app.content_store import (
 from app.excel_content import WorkbookImportError, export_course_workbook, import_course_workbook
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+APP_FILE = Path(__file__).resolve()
+
+
+def find_project_root() -> Path:
+    candidates = [
+        APP_FILE.parents[2],
+        APP_FILE.parents[1],
+        Path.cwd(),
+        Path.cwd().parent,
+        Path("/app"),
+    ]
+    for candidate in candidates:
+        if (candidate / "content-seeds").exists() or (candidate / "frontend" / "build" / "web").exists():
+            return candidate
+    return APP_FILE.parents[2]
+
+
+PROJECT_ROOT = find_project_root()
 FRONTEND_DIST_DIR = PROJECT_ROOT / "frontend" / "build" / "web"
 FRONTEND_INDEX = FRONTEND_DIST_DIR / "index.html"
 

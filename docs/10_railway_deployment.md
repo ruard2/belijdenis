@@ -9,8 +9,9 @@ De FastAPI backend draait op Railway met PostgreSQL.
 - Backend service
 - PostgreSQL service, later voor echte pilot
 
-De repo bevat nu een `railway.json` en `Dockerfile`. Railway bouwt daarmee de
-Flutter web frontend en serveert die via dezelfde FastAPI-service.
+De repo bevat nu een `railway.json`. Railway gebruikt Nixpacks voor de FastAPI
+backend. De Flutter webbuild staat als statisch deploy-artifact in
+`frontend/build/web` en wordt via dezelfde FastAPI-service geserveerd.
 
 ## Start command
 
@@ -18,7 +19,7 @@ Flutter web frontend en serveert die via dezelfde FastAPI-service.
 uvicorn app.main:app --host 0.0.0.0 --port $PORT
 ```
 
-In de Dockerfile staat dit als:
+In `railway.json` staat dit als:
 
 ```text
 cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
