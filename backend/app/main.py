@@ -12,6 +12,7 @@ from app.activity_store import (
     create_admin_session,
     create_guest_session,
     list_activity,
+    list_xp_awards,
     record_activity,
 )
 from app.bible_store import available_translations, get_passage
@@ -127,6 +128,11 @@ def activity(payload: dict) -> dict:
 @app.get("/admin/activity")
 def admin_activity(limit: int = 300) -> list[dict]:
     return list_activity(limit)
+
+
+@app.get("/admin/xp")
+def admin_xp(limit: int = 1000) -> list[dict]:
+    return list_xp_awards(limit)
 
 
 @app.get("/courses")

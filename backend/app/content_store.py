@@ -91,6 +91,24 @@ def init_db() -> None:
 
             CREATE INDEX IF NOT EXISTS idx_activity_block
             ON activity_events (block_id, action, created_at);
+
+            CREATE TABLE IF NOT EXISTS xp_awards (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                username TEXT NOT NULL,
+                role TEXT NOT NULL,
+                course_id TEXT NOT NULL,
+                chapter_id TEXT NOT NULL,
+                block_id TEXT NOT NULL,
+                block_type TEXT NOT NULL,
+                xp INTEGER NOT NULL,
+                reason TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(user_id, block_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_xp_awards_user
+            ON xp_awards (user_id, created_at);
             """
         )
 

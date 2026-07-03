@@ -65,6 +65,29 @@ def record_activity(payload: dict[str, Any]) -> dict[str, Any]:
                 created_at,
             ),
         )
+        awarded_xp = value.get("xp_awarded")
+        if isinstance(awarded_xp, int) and awarded_xp > 0 and payload.get("block_id"):
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO xp_awards (
+                    user_id, username, role, course_id, chapter_id, block_id,
+                    block_type, xp, reason, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    payload["user_id"],
+                    payload["username"],
+                    payload["role"],
+                    payload.get("course_id", ""),
+                    payload.get("chapter_id", ""),
+                    payload.get("block_id", ""),
+                    payload.get("block_type", ""),
+                    awarded_xp,
+                    payload["action"],
+                    created_at,
+                ),
+            )
 
     return {"id": cursor.lastrowid, "created_at": created_at}
 
@@ -101,3 +124,34 @@ def list_activity(limit: int = 300) -> list[dict[str, Any]]:
             }
         )
     return events
+
+
+def list_xp_awards(limit: int = 1000) -> list[dict[str, Any]]:
+    capped_limit = max(1, min(limit, 5000))
+    with connect() as connection:
+        rows = connection.execute(
+            """
+            SELECT *
+            FROM xp_awards
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+            """,
+            (capped_limit,),
+        ).fetchall()
+
+    return [
+        {
+            "id": row["id"],
+            "user_id": row["user_id"],
+            "username": row["username"],
+            "role": row["role"],
+            "course_id": row["course_id"],
+            "chapter_id": row["chapter_id"],
+            "block_id": row["block_id"],
+            "block_type": row["block_type"],
+            "xp": row["xp"],
+            "reason": row["reason"],
+            "created_at": row["created_at"],
+        }
+        for row in rows
+    ]

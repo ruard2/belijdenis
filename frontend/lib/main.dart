@@ -229,7 +229,14 @@ class ActivityTracker {
 
   Future<void> track(String action, Map<String, dynamic> value) async {
     if (_marksBlockComplete(action, value)) {
-      LessonProgress.instance.markComplete(context);
+      final awardedXp = LessonProgress.instance.markComplete(context);
+      if (awardedXp > 0) {
+        value = {
+          ...value,
+          'xp_awarded': awardedXp,
+          'xp_total': LessonProgress.instance.totalXp,
+        };
+      }
     }
     try {
       await _api.recordActivity(
@@ -240,6 +247,21 @@ class ActivityTracker {
         action: action,
         value: value,
       );
+      final awardedXp = value['xp_awarded'];
+      if (awardedXp is int && awardedXp > 0 && action != 'xp_awarded') {
+        await _api.recordActivity(
+          courseId: context.courseId,
+          chapterId: context.chapterId,
+          blockId: context.blockId,
+          blockType: context.blockType,
+          action: 'xp_awarded',
+          value: {
+            'xp': awardedXp,
+            'xp_total': LessonProgress.instance.totalXp,
+            'reason': action,
+          },
+        );
+      }
     } catch (_) {
       // Activity should never interrupt the lesson flow.
     }
@@ -249,14 +271,16 @@ class ActivityTracker {
     if (value['completed'] == true || value['block_completed'] == true) {
       return true;
     }
+    if (action == 'bible_annotation_saved') {
+      return context.blockType == 'bible';
+    }
     return {
       'distribution_submitted',
       'challenge_submitted',
       'multiple_choice_selected',
       'statement_response_answered',
-      'slider_changed',
       'media_canvas_posted',
-      'bible_read',
+      'media_completed',
     }.contains(action);
   }
 }
@@ -267,12 +291,14 @@ class BlockContext {
     required this.chapterId,
     required this.blockId,
     required this.blockType,
+    required this.xp,
   });
 
   final String courseId;
   final String chapterId;
   final String blockId;
   final String blockType;
+  final int xp;
 }
 
 class LessonProgress extends ChangeNotifier {
@@ -281,6 +307,7 @@ class LessonProgress extends ChangeNotifier {
   static final LessonProgress instance = LessonProgress._();
 
   final Set<String> _completed = {};
+  final Map<String, int> _xpByKey = {};
 
   bool isComplete(String chapterId, String blockId) {
     return _completed.contains(_key(chapterId, blockId));
@@ -290,18 +317,29 @@ class LessonProgress extends ChangeNotifier {
     return isComplete(context.chapterId, context.blockId);
   }
 
-  void markComplete(BlockContext context) {
-    if (context.chapterId.isEmpty || context.blockId.isEmpty) return;
+  int markComplete(BlockContext context) {
+    if (context.chapterId.isEmpty || context.blockId.isEmpty) return 0;
+    final key = _key(context.chapterId, context.blockId);
+    final alreadyComplete = _completed.contains(key);
+    final shouldAwardXp = !alreadyComplete && context.xp > 0;
     if (_completed.add(_key(context.chapterId, context.blockId))) {
       notifyListeners();
     }
+    if (shouldAwardXp) {
+      _xpByKey[key] = context.xp;
+      return context.xp;
+    }
+    return 0;
   }
 
   void clear() {
-    if (_completed.isEmpty) return;
+    if (_completed.isEmpty && _xpByKey.isEmpty) return;
     _completed.clear();
+    _xpByKey.clear();
     notifyListeners();
   }
+
+  int get totalXp => _xpByKey.values.fold(0, (sum, value) => sum + value);
 
   int completedCount(
     String chapterId,
@@ -1243,6 +1281,7 @@ class _ChapterDetailState extends State<ChapterDetail> {
                         chapterId: chapterId,
                         blockId: block['id'] as String? ?? '',
                         blockType: block['type'] as String? ?? '',
+                        xp: block['xp'] as int? ?? 0,
                       ),
                       isComplete: LessonProgress.instance.isComplete(
                         chapterId,
@@ -1283,6 +1322,7 @@ class _ChapterDetailState extends State<ChapterDetail> {
                         chapterId: chapterId,
                         blockId: block['id'] as String? ?? '',
                         blockType: block['type'] as String? ?? '',
+                        xp: block['xp'] as int? ?? 0,
                       ),
                       isComplete: LessonProgress.instance.isComplete(
                         chapterId,
@@ -1558,7 +1598,13 @@ class BlockPreview extends StatelessWidget {
     }
 
     if (['youtube', 'media_player', 'audio'].contains(block['type'])) {
-      return [MediaBlock(content: content, type: block['type'] as String)];
+      return [
+        MediaBlock(
+          content: content,
+          type: block['type'] as String,
+          blockContext: blockContext,
+        ),
+      ];
     }
 
     if (block['type'] == 'quote') {
@@ -2174,7 +2220,7 @@ class _StatementResponseBlockState extends State<StatementResponseBlock> {
             ),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 6),
         BlackboardBubbles(entries: entries, blockContext: widget.blockContext),
       ],
     );
@@ -2748,17 +2794,31 @@ class _SortingBlockState extends State<SortingBlock> {
       '${item['text'] ?? item['label'] ?? ''}';
 }
 
-class MediaBlock extends StatelessWidget {
-  const MediaBlock({super.key, required this.content, required this.type});
+class MediaBlock extends StatefulWidget {
+  const MediaBlock({
+    super.key,
+    required this.content,
+    required this.type,
+    required this.blockContext,
+  });
 
   final Map<String, dynamic> content;
   final String type;
+  final BlockContext blockContext;
+
+  @override
+  State<MediaBlock> createState() => _MediaBlockState();
+}
+
+class _MediaBlockState extends State<MediaBlock> {
+  bool opened = false;
+  bool completed = false;
 
   @override
   Widget build(BuildContext context) {
-    final url = content['url'] as String? ?? '';
-    final intro = content['intro'] as String? ?? '';
-    final isYoutube = type == 'youtube' && url.isNotEmpty;
+    final url = widget.content['url'] as String? ?? '';
+    final intro = widget.content['intro'] as String? ?? '';
+    final isYoutube = widget.type == 'youtube' && url.isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2777,7 +2837,9 @@ class MediaBlock extends StatelessWidget {
             child: Column(
               children: [
                 Icon(
-                  type == 'audio' ? Icons.audiotrack : Icons.smart_display,
+                  widget.type == 'audio'
+                      ? Icons.audiotrack
+                      : Icons.smart_display,
                   color: Colors.white,
                   size: 42,
                 ),
@@ -2791,14 +2853,43 @@ class MediaBlock extends StatelessWidget {
             ),
           ),
         if (url.isNotEmpty)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: () =>
-                  launchUrl(Uri.parse(url), webOnlyWindowName: '_blank'),
-              icon: const Icon(Icons.open_in_new),
-              label: const Text('Open in nieuw tabblad'),
-            ),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () async {
+                  setState(() => opened = true);
+                  await ActivityTracker(
+                    widget.blockContext,
+                  ).track('media_opened', {'url': url});
+                  await launchUrl(Uri.parse(url), webOnlyWindowName: '_blank');
+                },
+                icon: const Icon(Icons.open_in_new),
+                label: const Text('Open in nieuw tabblad'),
+              ),
+              FilledButton.icon(
+                onPressed: completed
+                    ? null
+                    : () async {
+                        setState(() {
+                          opened = true;
+                          completed = true;
+                        });
+                        await ActivityTracker(widget.blockContext).track(
+                          'media_completed',
+                          {
+                            'url': url,
+                            'opened_first': opened,
+                            'completed': true,
+                          },
+                        );
+                      },
+                icon: Icon(completed ? Icons.check_circle : Icons.check),
+                label: Text(completed ? 'Afgerond' : 'Ik heb gekeken'),
+              ),
+            ],
           ),
       ],
     );
@@ -3435,6 +3526,7 @@ class ReadingPlanBlock extends StatefulWidget {
 
 class _ReadingPlanBlockState extends State<ReadingPlanBlock> {
   static final Map<String, Set<int>> _completedByPlan = {};
+  static final Map<String, List<Map<String, String>>> _boardByPlan = {};
 
   String get planKey =>
       widget.content['id'] as String? ??
@@ -3446,6 +3538,9 @@ class _ReadingPlanBlockState extends State<ReadingPlanBlock> {
 
   Set<int> get completed =>
       _completedByPlan.putIfAbsent(planKey, () => <int>{});
+
+  List<Map<String, String>> get boardEntries =>
+      _boardByPlan.putIfAbsent(planKey, () => <Map<String, String>>[]);
 
   @override
   Widget build(BuildContext context) {
@@ -3538,38 +3633,58 @@ class _ReadingPlanBlockState extends State<ReadingPlanBlock> {
                         builder: (_) => BibleReaderDialog(
                           reference: reading.reference,
                           blockContext: widget.blockContext,
+                          onVerseMarked: (mark) =>
+                              _markReadingComplete(reading, mark, total),
                         ),
                       ),
-                      onToggle: () {
-                        final nextDone = !isDone;
-                        setState(() {
-                          if (!nextDone) {
-                            completed.remove(index);
-                          } else {
-                            completed.add(index);
-                          }
-                        });
-                        ActivityTracker(
-                          widget.blockContext,
-                        ).track('reading_plan_toggled', {
-                          'day': reading.dayLabel,
-                          'reference': reading.reference,
-                          'item_completed': nextDone,
-                          'completed_count': completed.length,
-                          'total': total,
-                          'block_completed':
-                              total > 0 && completed.length == total,
-                        });
-                      },
                     ),
                   );
                 }).toList(),
               );
             },
           ),
+          const SizedBox(height: 6),
+          ReadingPlanBoard(entries: boardEntries),
         ],
       ),
     );
+  }
+
+  void _markReadingComplete(
+    ReadingPlanItem reading,
+    BibleVerseMark mark,
+    int total,
+  ) {
+    final meaningful = {'♥', '?', '!'}.contains(mark.emoji);
+    if (!meaningful) return;
+
+    final wasComplete = completed.contains(reading.index);
+    setState(() {
+      completed.add(reading.index);
+      final entry = {
+        'name': AppSession.current?.username ?? 'Gast',
+        'label': reading.dayLabel,
+        'answer':
+            '${reading.reference} vers ${mark.verse}: ${mark.emoji} ${mark.text}',
+      };
+      boardEntries.removeWhere(
+        (item) =>
+            item['name'] == entry['name'] && item['label'] == entry['label'],
+      );
+      boardEntries.add(entry);
+    });
+
+    ActivityTracker(widget.blockContext).track('reading_plan_verse_marked', {
+      'day': reading.dayLabel,
+      'reference': reading.reference,
+      'verse': mark.verse,
+      'emoji': mark.emoji,
+      'text': mark.text,
+      'item_completed': !wasComplete,
+      'completed_count': completed.length,
+      'total': total,
+      'block_completed': total > 0 && completed.length == total,
+    });
   }
 
   List<ReadingPlanItem> _readings() {
@@ -3641,7 +3756,6 @@ class _ReadingTile extends StatelessWidget {
     required this.theme,
     required this.isDone,
     required this.onOpen,
-    required this.onToggle,
   });
 
   final String dayLabel;
@@ -3649,7 +3763,6 @@ class _ReadingTile extends StatelessWidget {
   final String theme;
   final bool isDone;
   final VoidCallback onOpen;
-  final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -3670,13 +3783,13 @@ class _ReadingTile extends StatelessWidget {
           child: Row(
             children: [
               IconButton.filledTonal(
-                onPressed: onToggle,
+                onPressed: onOpen,
                 icon: Icon(
                   isDone ? Icons.check_circle : Icons.radio_button_unchecked,
                 ),
                 tooltip: isDone
-                    ? 'Markeer als ongelezen'
-                    : 'Markeer als gelezen',
+                    ? 'Gelezen en vers gemarkeerd'
+                    : 'Open en markeer een vers',
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -3719,6 +3832,17 @@ class _ReadingTile extends StatelessWidget {
   }
 }
 
+class ReadingPlanBoard extends StatelessWidget {
+  const ReadingPlanBoard({super.key, required this.entries});
+
+  final List<Map<String, String>> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlackboardBubbles(entries: entries);
+  }
+}
+
 class BibleBlock extends StatelessWidget {
   const BibleBlock({
     super.key,
@@ -3754,7 +3878,6 @@ class BibleBlock extends StatelessWidget {
             children: references.map((reference) {
               return FilledButton.icon(
                 onPressed: () async {
-                  final openedAt = DateTime.now();
                   ActivityTracker(
                     blockContext,
                   ).track('bible_opened', {'reference': reference});
@@ -3765,16 +3888,6 @@ class BibleBlock extends StatelessWidget {
                       blockContext: blockContext,
                     ),
                   );
-                  final secondsOpen = DateTime.now()
-                      .difference(openedAt)
-                      .inSeconds;
-                  if (secondsOpen >= 5) {
-                    await ActivityTracker(blockContext).track('bible_read', {
-                      'reference': reference,
-                      'seconds_open': secondsOpen,
-                      'completed': true,
-                    });
-                  }
                 },
                 icon: const Icon(Icons.menu_book),
                 label: Text(reference),
@@ -3798,10 +3911,12 @@ class BibleReaderDialog extends StatelessWidget {
     super.key,
     required this.reference,
     this.blockContext,
+    this.onVerseMarked,
   });
 
   final String reference;
   final BlockContext? blockContext;
+  final ValueChanged<BibleVerseMark>? onVerseMarked;
 
   @override
   Widget build(BuildContext context) {
@@ -3830,6 +3945,7 @@ class BibleReaderDialog extends StatelessWidget {
               reference: reference,
               translations: translations,
               blockContext: blockContext,
+              onVerseMarked: onVerseMarked,
             );
           },
         ),
@@ -3844,11 +3960,13 @@ class BibleReaderTabs extends StatefulWidget {
     required this.reference,
     required this.translations,
     this.blockContext,
+    this.onVerseMarked,
   });
 
   final String reference;
   final List<String> translations;
   final BlockContext? blockContext;
+  final ValueChanged<BibleVerseMark>? onVerseMarked;
 
   @override
   State<BibleReaderTabs> createState() => _BibleReaderTabsState();
@@ -3942,6 +4060,7 @@ class _BibleReaderTabsState extends State<BibleReaderTabs>
                     reference: widget.reference,
                     translation: translation,
                     blockContext: widget.blockContext,
+                    onVerseMarked: widget.onVerseMarked,
                   ),
                 )
                 .toList(),
@@ -3958,11 +4077,13 @@ class BiblePassageView extends StatefulWidget {
     required this.reference,
     required this.translation,
     this.blockContext,
+    this.onVerseMarked,
   });
 
   final String reference;
   final String translation;
   final BlockContext? blockContext;
+  final ValueChanged<BibleVerseMark>? onVerseMarked;
 
   @override
   State<BiblePassageView> createState() => _BiblePassageViewState();
@@ -4169,9 +4290,7 @@ class _BiblePassageViewState extends State<BiblePassageView> {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: ['💡', '🙏', '❤️', '❓', '🔥', '🌱'].map((
-                        emoji,
-                      ) {
+                      children: ['?', '?', '!'].map((emoji) {
                         final active = selectedEmoji == emoji;
                         return ChoiceChip(
                           selected: active,
@@ -4243,6 +4362,18 @@ class _BiblePassageViewState extends State<BiblePassageView> {
                                 'note': note,
                                 'emoji': selectedEmoji,
                               });
+                            }
+                            if (selectedEmoji.isNotEmpty) {
+                              widget.onVerseMarked?.call(
+                                BibleVerseMark(
+                                  reference: widget.reference,
+                                  translation: widget.translation,
+                                  verse: number,
+                                  text: text,
+                                  emoji: selectedEmoji,
+                                  note: note,
+                                ),
+                              );
                             }
                             Navigator.of(context).pop();
                           },
@@ -4386,6 +4517,24 @@ class VerseAnnotation {
   final String emoji;
 }
 
+class BibleVerseMark {
+  const BibleVerseMark({
+    required this.reference,
+    required this.translation,
+    required this.verse,
+    required this.text,
+    required this.emoji,
+    required this.note,
+  });
+
+  final String reference;
+  final String translation;
+  final int verse;
+  final String text;
+  final String emoji;
+  final String note;
+}
+
 class BibleVerseRow extends StatelessWidget {
   const BibleVerseRow({
     super.key,
@@ -4497,7 +4646,7 @@ class QuestionFlow extends StatefulWidget {
   const QuestionFlow({
     super.key,
     required this.questions,
-    this.minCharacters = 0,
+    this.minCharacters = 20,
     this.labelPrefix = 'Vraag',
     this.hintText = 'Typ je antwoord...',
     this.blockContext,
@@ -5045,6 +5194,10 @@ class _DistributionBlockState extends State<DistributionBlock> {
     final shareWithGroup = widget.content['share_with_group'] as bool? ?? true;
     final submissions =
         _groupSubmissions[boardKey] ?? const <Map<String, dynamic>>[];
+    final explanationRequired = afterPrompt?.trim().isNotEmpty == true;
+    final explanationReady =
+        !explanationRequired || explanationController.text.trim().length >= 20;
+    final canSubmit = isComplete && explanationReady;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -5090,7 +5243,7 @@ class _DistributionBlockState extends State<DistributionBlock> {
                     ),
                   ),
                   FilledButton.icon(
-                    onPressed: isComplete
+                    onPressed: canSubmit
                         ? () => _submitDistribution(shareWithGroup)
                         : null,
                     icon: const Icon(Icons.check),
@@ -5112,6 +5265,7 @@ class _DistributionBlockState extends State<DistributionBlock> {
             controller: explanationController,
             minLines: 2,
             maxLines: 4,
+            onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               hintText: 'Schrijf je reactie...',
               filled: true,
@@ -5122,10 +5276,21 @@ class _DistributionBlockState extends State<DistributionBlock> {
             ),
           ),
           const SizedBox(height: 8),
+          if (!explanationReady) ...[
+            const Text(
+              'Schrijf eerst een korte toelichting van minimaal 20 tekens.',
+              style: TextStyle(
+                color: Color(0xFF8A5B16),
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           Align(
             alignment: Alignment.centerRight,
             child: FilledButton.icon(
-              onPressed: isComplete
+              onPressed: canSubmit
                   ? () => _submitDistribution(shareWithGroup)
                   : null,
               icon: const Icon(Icons.send),
@@ -5136,7 +5301,7 @@ class _DistributionBlockState extends State<DistributionBlock> {
           ),
         ],
         if (shareWithGroup) ...[
-          const SizedBox(height: 14),
+          const SizedBox(height: 6),
           DistributionGroupBoard(
             unit: unit,
             options: options,
