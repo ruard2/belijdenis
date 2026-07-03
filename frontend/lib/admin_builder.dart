@@ -2,14 +2,32 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
-const adminApiBaseUrl = String.fromEnvironment(
+const _configuredAdminApiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'http://127.0.0.1:8000',
+  defaultValue: '',
 );
+
+final String adminApiBaseUrl = _resolveAdminApiBaseUrl();
+
+String _resolveAdminApiBaseUrl() {
+  if (_configuredAdminApiBaseUrl.isNotEmpty) {
+    return _configuredAdminApiBaseUrl;
+  }
+  if (kIsWeb) {
+    final origin = Uri.base.origin;
+    if (origin.startsWith('http://127.0.0.1') ||
+        origin.startsWith('http://localhost')) {
+      return 'http://127.0.0.1:8000';
+    }
+    return origin;
+  }
+  return 'http://127.0.0.1:8000';
+}
 
 class AdminBuilder extends StatefulWidget {
   const AdminBuilder({super.key, required this.onClose});

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 from app.activity_store import (
     create_admin_session,
@@ -26,6 +28,10 @@ from app.content_store import (
 )
 from app.excel_content import WorkbookImportError, export_course_workbook, import_course_workbook
 
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+FRONTEND_DIST_DIR = PROJECT_ROOT / "frontend" / "build" / "web"
+FRONTEND_INDEX = FRONTEND_DIST_DIR / "index.html"
 
 app = FastAPI(
     title="Houvast API",
@@ -64,8 +70,10 @@ def startup() -> None:
     init_db()
 
 
-@app.get("/")
-def root() -> dict[str, str]:
+@app.get("/", response_model=None)
+def root():
+    if FRONTEND_INDEX.exists():
+        return FileResponse(FRONTEND_INDEX)
     return {
         "name": "Houvast API",
         "status": "running",
@@ -213,3 +221,7 @@ def bible_passage(reference: str, translation: str = "HSV") -> dict:
 def reload_content() -> dict[str, str]:
     reseed_database()
     return {"status": "reseeded"}
+
+
+if FRONTEND_DIST_DIR.exists():
+    app.mount("/", StaticFiles(directory=FRONTEND_DIST_DIR, html=True), name="frontend")

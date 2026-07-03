@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
@@ -12,10 +12,27 @@ import 'bible_translation_preferences_stub.dart'
 import 'youtube_embed_stub.dart'
     if (dart.library.html) 'youtube_embed_web.dart';
 
-const apiBaseUrl = String.fromEnvironment(
+const _configuredApiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'http://127.0.0.1:8000',
+  defaultValue: '',
 );
+
+final String apiBaseUrl = _resolveApiBaseUrl();
+
+String _resolveApiBaseUrl() {
+  if (_configuredApiBaseUrl.isNotEmpty) {
+    return _configuredApiBaseUrl;
+  }
+  if (kIsWeb) {
+    final origin = Uri.base.origin;
+    if (origin.startsWith('http://127.0.0.1') ||
+        origin.startsWith('http://localhost')) {
+      return 'http://127.0.0.1:8000';
+    }
+    return origin;
+  }
+  return 'http://127.0.0.1:8000';
+}
 
 void main() {
   runApp(const HouvastApp());
