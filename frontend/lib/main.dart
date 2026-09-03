@@ -3546,6 +3546,11 @@ class _ReadingPlanBlockState extends State<ReadingPlanBlock> {
   Widget build(BuildContext context) {
     final intro = widget.content['intro'] as String? ?? '';
     final focus = widget.content['focus'] as String? ?? '';
+    final showShoutoutwall =
+        widget.content['show_shoutoutwall'] as bool? ?? true;
+    final shoutoutwallQuestion =
+        widget.content['shoutoutwall_question'] as String? ??
+        'Markeer een vers dat je raakt. Je keuze verschijnt hier.';
     final readings = _readings();
     final total = readings.length;
     final done = completed.length.clamp(0, total);
@@ -3643,8 +3648,13 @@ class _ReadingPlanBlockState extends State<ReadingPlanBlock> {
               );
             },
           ),
-          const SizedBox(height: 6),
-          ReadingPlanBoard(entries: boardEntries),
+          if (showShoutoutwall) ...[
+            const SizedBox(height: 6),
+            ReadingPlanBoard(
+              entries: boardEntries,
+              question: shoutoutwallQuestion,
+            ),
+          ],
         ],
       ),
     );
@@ -3833,13 +3843,22 @@ class _ReadingTile extends StatelessWidget {
 }
 
 class ReadingPlanBoard extends StatelessWidget {
-  const ReadingPlanBoard({super.key, required this.entries});
+  const ReadingPlanBoard({
+    super.key,
+    required this.entries,
+    required this.question,
+  });
 
   final List<Map<String, String>> entries;
+  final String question;
 
   @override
   Widget build(BuildContext context) {
-    return BlackboardBubbles(entries: entries);
+    return BlackboardBubbles(
+      entries: entries,
+      title: 'Shoutoutwall',
+      emptyMessage: question,
+    );
   }
 }
 
@@ -4827,10 +4846,14 @@ class BlackboardBubbles extends StatefulWidget {
     super.key,
     required this.entries,
     this.blockContext,
+    this.title = 'Groepsbord',
+    this.emptyMessage,
   });
 
   final List<Map<String, String>> entries;
   final BlockContext? blockContext;
+  final String title;
+  final String? emptyMessage;
 
   @override
   State<BlackboardBubbles> createState() => _BlackboardBubblesState();
@@ -4869,15 +4892,19 @@ class _BlackboardBubblesState extends State<BlackboardBubbles> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Groepsbord',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+          Text(
+            widget.title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
-            widget.entries.isEmpty
-                ? 'Typ hierboven iets. Je antwoord verschijnt hier direct.'
-                : 'Tik op een wolkje om op die persoon te reageren.',
+            widget.emptyMessage ??
+                (widget.entries.isEmpty
+                    ? 'Typ hierboven iets. Je antwoord verschijnt hier direct.'
+                    : 'Tik op een wolkje om op die persoon te reageren.'),
             style: const TextStyle(color: Color(0xFFCFE0D6), fontSize: 13),
           ),
           const SizedBox(height: 12),

@@ -824,6 +824,7 @@ class BlockEditor extends StatelessWidget {
           _listEditor('Vragen', content, 'questions'),
         ];
       case 'reading_plan':
+        final showShoutoutwall = content['show_shoutoutwall'] as bool? ?? true;
         return [
           _field(
             'Intro',
@@ -838,6 +839,19 @@ class BlockEditor extends StatelessWidget {
             maxLines: 3,
           ),
           _listEditor('Lezingen', content, 'references'),
+          _switchField(
+            'Shoutoutwall tonen',
+            showShoutoutwall,
+            (v) => content['show_shoutoutwall'] = v,
+          ),
+          if (showShoutoutwall)
+            _field(
+              'Vraag / tekst onder Shoutoutwall',
+              content['shoutoutwall_question'] ??
+                  'Markeer een vers dat je raakt. Je keuze verschijnt hier.',
+              (v) => content['shoutoutwall_question'] = v,
+              maxLines: 3,
+            ),
         ];
       case 'distribution':
         return [
@@ -1489,6 +1503,9 @@ Map<String, dynamic> defaultContent(String type) {
       'intro': 'Lees deze gedeelten door in de week.',
       'focus':
           'Let erop hoe de lezingen samen het thema van deze week uitwerken.',
+      'show_shoutoutwall': true,
+      'shoutoutwall_question':
+          'Markeer een vers dat je raakt. Je keuze verschijnt hier.',
       'references': [
         'Psalm 1',
         'Psalm 2',
