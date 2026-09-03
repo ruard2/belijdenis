@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from app.content_store import connect
+from app.database import connect
 
 
 ADMIN_PASSWORD = "ABCD1234"

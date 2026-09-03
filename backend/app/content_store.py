@@ -1,32 +1,22 @@
 from __future__ import annotations
 
 import json
-import sqlite3
 from pathlib import Path
 from typing import Any
 
+from app.database import Connection, connect, uses_postgres
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONTENT_SEEDS_DIR = PROJECT_ROOT / "content-seeds"
-DATA_DIR = PROJECT_ROOT / "backend" / "data"
-DB_PATH = DATA_DIR / "houvast.db"
 
 
 class ContentNotFoundError(Exception):
     pass
 
 
-def connect() -> sqlite3.Connection:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(DB_PATH)
-    connection.row_factory = sqlite3.Row
-    return connection
-
-
 def init_db() -> None:
     with connect() as connection:
-        connection.executescript(
-            """
+        schema = """
             CREATE TABLE IF NOT EXISTS courses (
                 id TEXT PRIMARY KEY,
                 slug TEXT NOT NULL UNIQUE,
@@ -110,7 +100,11 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_xp_awards_user
             ON xp_awards (user_id, created_at);
             """
-        )
+        if uses_postgres():
+            schema = schema.replace(
+                "id INTEGER PRIMARY KEY AUTOINCREMENT", "id BIGSERIAL PRIMARY KEY"
+            )
+        connection.executescript(schema)
 
         row = connection.execute("SELECT COUNT(*) AS count FROM courses").fetchone()
         if row and row["count"] == 0:
@@ -129,7 +123,7 @@ def reseed_database() -> None:
         seed_database(connection)
 
 
-def seed_database(connection: sqlite3.Connection) -> None:
+def seed_database(connection: Connection) -> None:
     for path in sorted(CONTENT_SEEDS_DIR.glob("course_*.json")):
         course = _read_json(path)
         connection.execute(
@@ -196,7 +190,7 @@ def _read_json(path: Path) -> dict[str, Any]:
         return json.load(handle)
 
 
-def _course_from_row(row: sqlite3.Row) -> dict[str, Any]:
+def _course_from_row(row: Any) -> dict[str, Any]:
     return {
         "id": row["id"],
         "slug": row["slug"],
@@ -208,7 +202,7 @@ def _course_from_row(row: sqlite3.Row) -> dict[str, Any]:
     }
 
 
-def _chapter_from_row(row: sqlite3.Row, blocks: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+def _chapter_from_row(row: Any, blocks: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     chapter = {
         "id": row["id"],
         "course_id": row["course_id"],
@@ -225,7 +219,7 @@ def _chapter_from_row(row: sqlite3.Row, blocks: list[dict[str, Any]] | None = No
     return chapter
 
 
-def _block_from_row(row: sqlite3.Row) -> dict[str, Any]:
+def _block_from_row(row: Any) -> dict[str, Any]:
     return {
         "id": row["id"],
         "chapter_id": row["chapter_id"],

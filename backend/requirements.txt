@@ -3,3 +3,4 @@ uvicorn[standard]
 pydantic
 openpyxl
 python-multipart
+psycopg[binary]==3.2.10
