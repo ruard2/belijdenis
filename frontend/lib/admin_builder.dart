@@ -838,9 +838,8 @@ class BlockEditor extends StatelessWidget {
             (v) => content['focus'] = v,
             maxLines: 3,
           ),
-          _listEditor('Lezingen', content, 'references'),
           _switchField(
-            'Shoutoutwall tonen',
+            'Shoutoutwall (klasbord) tonen',
             showShoutoutwall,
             (v) => content['show_shoutoutwall'] = v,
           ),
@@ -852,6 +851,7 @@ class BlockEditor extends StatelessWidget {
               (v) => content['shoutoutwall_question'] = v,
               maxLines: 3,
             ),
+          _readingPlanEditor(content),
         ];
       case 'distribution':
         return [
@@ -1199,6 +1199,87 @@ class BlockEditor extends StatelessWidget {
     );
   }
 
+  Widget _readingPlanEditor(Map<String, dynamic> content) {
+    final rawReadings = content['readings'];
+    final readings = rawReadings is List
+        ? rawReadings
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList()
+        : (content['references'] as List<dynamic>? ?? <dynamic>[])
+              .asMap()
+              .entries
+              .map(
+                (entry) => <String, dynamic>{
+                  'day': 'Dag ${entry.key + 1}',
+                  'reference': '${entry.value}',
+                  'theme': '',
+                },
+              )
+              .toList();
+    content['readings'] = readings;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _rowTitle('Lezingen', () {
+          readings.add({
+            'day': 'Dag ${readings.length + 1}',
+            'reference': '',
+            'theme': '',
+          });
+          onChanged();
+        }),
+        for (var i = 0; i < readings.length; i++)
+          Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _field(
+                        'Dag ${i + 1}',
+                        readings[i]['day'] ?? 'Dag ${i + 1}',
+                        (v) => readings[i]['day'] = v,
+                        width: 180,
+                      ),
+                      _field(
+                        'Bijbelgedeelte ${i + 1}',
+                        readings[i]['reference'] ?? '',
+                        (v) => readings[i]['reference'] = v,
+                        width: 320,
+                      ),
+                      IconButton(
+                        tooltip: 'Lezing verwijderen',
+                        onPressed: () {
+                          readings.removeAt(i);
+                          onChanged();
+                        },
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  _field(
+                    'Toelichting / thema ${i + 1}',
+                    readings[i]['theme'] ?? '',
+                    (v) => readings[i]['theme'] = v,
+                    maxLines: 2,
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _multipleChoiceOptions(Map<String, dynamic> content) {
     final options = (content['options'] as List<dynamic>? ?? <dynamic>[])
         .cast<Map<String, dynamic>>();
@@ -1506,14 +1587,9 @@ Map<String, dynamic> defaultContent(String type) {
       'show_shoutoutwall': true,
       'shoutoutwall_question':
           'Markeer een vers dat je raakt. Je keuze verschijnt hier.',
-      'references': [
-        'Psalm 1',
-        'Psalm 2',
-        'Psalm 3',
-        'Psalm 4',
-        'Psalm 5',
-        'Psalm 6',
-        'Psalm 7',
+      'readings': [
+        for (var day = 1; day <= 7; day++)
+          {'day': 'Dag $day', 'reference': 'Psalm $day', 'theme': ''},
       ],
     },
     'slider' => {
