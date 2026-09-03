@@ -83,6 +83,17 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def prevent_stale_frontend_cache(request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.endswith((".html", ".js", ".json")):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 @app.on_event("startup")
 def startup() -> None:
     init_db()
