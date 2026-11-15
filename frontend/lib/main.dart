@@ -4126,8 +4126,13 @@ class _ReadingPlanBlockState extends State<ReadingPlanBlock> {
               ? (AppSession.current?.username ?? item.username)
               : item.username,
           'label': '${item.data['day'] ?? ''}',
-          'answer':
-              '${item.data['reference']} vers ${item.data['verse']}: ${item.data['emoji']} ${item.data['text']}',
+          'answer': [
+            '${item.data['reference']} vers ${item.data['verse']}'
+                '${'${item.data['emoji'] ?? ''}'.isEmpty ? '' : ' ${item.data['emoji']}'}',
+            '“${item.data['text'] ?? ''}”',
+            if ('${item.data['note'] ?? ''}'.trim().isNotEmpty)
+              '${item.data['note']}',
+          ].join('\n'),
         },
       )
       .toList();
@@ -4140,7 +4145,7 @@ class _ReadingPlanBlockState extends State<ReadingPlanBlock> {
         widget.content['show_shoutoutwall'] as bool? ?? true;
     final shoutoutwallQuestion =
         widget.content['shoutoutwall_question'] as String? ??
-        'Markeer een vers dat je raakt. Je keuze verschijnt hier.';
+        'Open een tekst, tik op een vers dat je raakt en kies "Zet op leesbord". Het verschijnt hier voor de hele groep.';
     final readings = _readings();
     final total = readings.length;
     final done = completed.length.clamp(0, total);
@@ -4223,15 +4228,18 @@ class _ReadingPlanBlockState extends State<ReadingPlanBlock> {
                       reference: reading.reference,
                       theme: reading.theme,
                       isDone: isDone,
-                      onOpen: () => showDialog<void>(
-                        context: context,
-                        builder: (_) => BibleReaderDialog(
-                          reference: reading.reference,
-                          blockContext: widget.blockContext,
-                          onVerseMarked: (mark) =>
-                              _markReadingComplete(reading, mark, total),
-                        ),
-                      ),
+                      onOpen: () async {
+                        await showDialog<void>(
+                          context: context,
+                          builder: (_) => BibleReaderDialog(
+                            reference: reading.reference,
+                            blockContext: widget.blockContext,
+                            onVerseMarked: (mark) =>
+                                _markReadingComplete(reading, mark, total),
+                          ),
+                        );
+                        await board.load();
+                      },
                     ),
                   );
                 }).toList(),
@@ -4257,9 +4265,6 @@ class _ReadingPlanBlockState extends State<ReadingPlanBlock> {
     BibleVerseMark mark,
     int total,
   ) async {
-    final meaningful = {'♥', '?', '!'}.contains(mark.emoji);
-    if (!meaningful) return;
-
     final wasComplete = completed.contains(reading.index);
     try {
       await board.put('read', {
@@ -4268,6 +4273,7 @@ class _ReadingPlanBlockState extends State<ReadingPlanBlock> {
         'verse': mark.verse,
         'emoji': mark.emoji,
         'text': mark.text,
+        'note': mark.note,
       }, key: '${reading.index}');
     } catch (exception) {
       if (mounted) {
@@ -5182,18 +5188,16 @@ class _BiblePassageViewState extends State<BiblePassageView> {
                                 'emoji': selectedEmoji,
                               });
                             }
-                            if (selectedEmoji.isNotEmpty) {
-                              widget.onVerseMarked?.call(
-                                BibleVerseMark(
-                                  reference: widget.reference,
-                                  translation: widget.translation,
-                                  verse: number,
-                                  text: text,
-                                  emoji: selectedEmoji,
-                                  note: note,
-                                ),
-                              );
-                            }
+                            widget.onVerseMarked?.call(
+                              BibleVerseMark(
+                                reference: widget.reference,
+                                translation: widget.translation,
+                                verse: number,
+                                text: text,
+                                emoji: selectedEmoji,
+                                note: note,
+                              ),
+                            );
                             Navigator.of(context).pop();
                           },
                           icon: const Icon(Icons.check),
@@ -5529,7 +5533,7 @@ class _QuestionFlowState extends State<QuestionFlow> {
         widget.blockContext!.blockId.isNotEmpty) {
       _loadAnswers(restoreOwn: true);
       _refreshTimer = Timer.periodic(
-        const Duration(seconds: 30),
+        const Duration(seconds: 15),
         (_) => _loadAnswers(),
       );
     }

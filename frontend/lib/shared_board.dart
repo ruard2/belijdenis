@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 
 import 'auth_token.dart';
@@ -122,13 +122,20 @@ class BoardApi {
 }
 
 /// Houdt de items van één scope bij en ververst ze periodiek.
-class SharedBoardController extends ChangeNotifier {
+class SharedBoardController extends ChangeNotifier with WidgetsBindingObserver {
   SharedBoardController(
     this.scope, {
-    Duration refresh = const Duration(seconds: 30),
+    Duration refresh = const Duration(seconds: 15),
   }) {
     load();
     _timer = Timer.periodic(refresh, (_) => load());
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Terug in de app (tab/telefoon weer actief): meteen verversen.
+    if (state == AppLifecycleState.resumed) load();
   }
 
   final String scope;
@@ -205,6 +212,7 @@ class SharedBoardController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 }
