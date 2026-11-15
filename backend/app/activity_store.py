@@ -143,7 +143,7 @@ def list_block_answers(block_id: str) -> list[dict[str, Any]]:
             (block_id,),
         ).fetchall()
 
-    latest: dict[tuple[str, int], dict[str, Any]] = {}
+    latest: dict[tuple[str, str, int], dict[str, Any]] = {}
     for row in rows:
         try:
             value = json.loads(row["value_json"])
@@ -153,8 +153,10 @@ def list_block_answers(block_id: str) -> list[dict[str, Any]]:
         answer = str(value.get("answer", "")).strip()
         if not isinstance(index, int) or not answer:
             continue
-        latest[(row["user_id"], index)] = {
+        flow = str(value.get("flow", ""))
+        latest[(row["user_id"], flow, index)] = {
             "user_id": row["user_id"],
+            "flow": flow,
             "username": row["username"],
             "role": row["role"],
             "question_index": index,

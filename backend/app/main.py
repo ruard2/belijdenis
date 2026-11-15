@@ -34,6 +34,18 @@ from app.auth_store import (
     set_chapter_completed,
     update_user,
 )
+from app.board_store import (
+    BoardError,
+    NotAllowedError,
+    delete_item,
+    delete_own_key,
+    delete_user_items,
+    get_upload,
+    init_board_db,
+    list_items,
+    put_item,
+    save_upload,
+)
 from app.bible_store import available_translations, get_passage
 from app.content_store import (
     ContentNotFoundError,
@@ -117,6 +129,7 @@ async def prevent_stale_frontend_cache(request, call_next):
 def startup() -> None:
     init_db()
     init_auth_db()
+    init_board_db()
     if admin_password_is_default():
         print("WAARSCHUWING: ADMIN_PASSWORD is niet ingesteld; standaardwachtwoord actief.")
 
@@ -235,6 +248,77 @@ def block_answers(block_id: str, session: dict = Depends(require_session)) -> li
     return [a for a in answers if a["user_id"] in valid]
 
 
+# ---------------------------------------------------------------------------
+# Gedeelde borden (reacties, emoji's, verdeelvragen, mediabord, aantekeningen)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/board")
+def board_list(scope: str, session: dict = Depends(require_session)) -> list[dict]:
+    visible = active_user_ids() | {"admin", session["user_id"]}
+    return list_items(scope, visible)
+
+
+@app.post("/board")
+def board_put(payload: dict, session: dict = Depends(require_session)) -> dict:
+    try:
+        return put_item(
+            str(payload.get("scope", "")),
+            str(payload.get("kind", "")),
+            payload.get("key"),
+            payload.get("data", {}),
+            session,
+        )
+    except BoardError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.delete("/board/items/{item_id}")
+def board_delete_item(item_id: int, session: dict = Depends(require_session)) -> dict:
+    try:
+        delete_item(item_id, session)
+    except NotAllowedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    return {"status": "deleted"}
+
+
+@app.delete("/board")
+def board_delete_key(
+    scope: str, kind: str, key: str, session: dict = Depends(require_session)
+) -> dict:
+    delete_own_key(scope, kind, key, session)
+    return {"status": "deleted"}
+
+
+@app.post("/uploads")
+async def upload_file(
+    file: UploadFile = File(...), session: dict = Depends(require_session)
+) -> dict:
+    data = await file.read()
+    try:
+        return save_upload(file.filename or "bestand", file.content_type or "", data, session)
+    except BoardError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/uploads/{upload_id}")
+def download_file(upload_id: str) -> Response:
+    upload = get_upload(upload_id)
+    if upload is None:
+        raise HTTPException(status_code=404, detail="Bestand niet gevonden.")
+    return Response(
+        content=upload["data"],
+        media_type=upload["content_type"],
+        headers={
+            "Cache-Control": "public, max-age=31536000, immutable",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Disposition": f'inline; filename="{upload["filename"]}"'.encode(
+                "latin-1", "replace"
+            ).decode("latin-1"),
+        },
+    )
+
+
 @app.get("/me/progress")
 def my_progress(session: dict = Depends(require_session)) -> dict:
     return get_progress(session["user_id"])
@@ -305,6 +389,7 @@ def admin_delete_user(user_id: str, _: dict = Depends(require_admin)) -> dict:
         delete_user(user_id)
     except UserNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    delete_user_items(user_id)
     return {"status": "deleted"}
 
 

@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'admin_builder.dart';
 import 'auth_token.dart';
+import 'shared_board.dart';
 import 'bible_translation_preferences_stub.dart'
     if (dart.library.html) 'bible_translation_preferences_web.dart';
 import 'youtube_embed_stub.dart'
@@ -2215,6 +2216,7 @@ class BlockPreview extends StatelessWidget {
           questions: (content['discussion_questions'] as List)
               .map((item) => '$item')
               .toList(),
+          labelPrefix: 'Gespreksvraag',
           blockContext: blockContext,
         ),
       );
@@ -2686,7 +2688,13 @@ class _StatementResponseBlockState extends State<StatementResponseBlock> {
           ],
         ),
         const SizedBox(height: 6),
-        BlackboardBubbles(entries: entries, blockContext: widget.blockContext),
+        BlackboardBubbles(
+          entries: entries,
+          blockContext: widget.blockContext,
+          boardScope: widget.blockContext == null
+              ? null
+              : 'block:${widget.blockContext!.blockId}',
+        ),
       ],
     );
   }
@@ -3039,7 +3047,13 @@ class _ChallengeBlockState extends State<ChallengeBlock> {
           ),
         ),
         const SizedBox(height: 14),
-        BlackboardBubbles(entries: entries, blockContext: widget.blockContext),
+        BlackboardBubbles(
+          entries: entries,
+          blockContext: widget.blockContext,
+          boardScope: widget.blockContext == null
+              ? null
+              : 'block:${widget.blockContext!.blockId}',
+        ),
       ],
     );
   }
@@ -3415,31 +3429,44 @@ class MediaCanvasBlock extends StatefulWidget {
 }
 
 class _MediaCanvasBlockState extends State<MediaCanvasBlock> {
-  static final Map<String, List<CanvasMediaItem>> _boards = {};
-
   final linkController = TextEditingController();
   final noteController = TextEditingController();
   PlatformFile? pickedFile;
+  late final SharedBoardController board;
+  bool posting = false;
 
-  String get boardKey =>
-      widget.content['id'] as String? ??
-      widget.content['prompt'] as String? ??
-      identityHashCode(widget.content).toString();
-
-  List<CanvasMediaItem> get items =>
-      _boards.putIfAbsent(boardKey, () => <CanvasMediaItem>[]);
+  List<CanvasMediaItem> get items => board
+      .ofKind('media')
+      .toList()
+      .reversed
+      .map(
+        (item) => CanvasMediaItem(
+          name: item.isMine ? 'Jij' : item.username,
+          note: '${item.data['note'] ?? ''}',
+          kind: '${item.data['kind'] ?? 'link'}',
+          link: '${item.data['link'] ?? ''}',
+          fileName: item.data['file_name'] as String?,
+          fileUrl: item.data['file_url'] as String?,
+          boardItem: item,
+        ),
+      )
+      .toList();
 
   @override
   void initState() {
     super.initState();
     linkController.addListener(refreshSubmitState);
     noteController.addListener(refreshSubmitState);
+    board = SharedBoardController('block:${widget.blockContext.blockId}')
+      ..addListener(refreshSubmitState);
   }
 
   @override
   void dispose() {
     linkController.removeListener(refreshSubmitState);
     noteController.removeListener(refreshSubmitState);
+    board.removeListener(refreshSubmitState);
+    board.dispose();
     linkController.dispose();
     noteController.dispose();
     super.dispose();
@@ -3517,16 +3544,33 @@ class _MediaCanvasBlockState extends State<MediaCanvasBlock> {
               Align(
                 alignment: Alignment.centerRight,
                 child: FilledButton.icon(
-                  onPressed: canSubmit ? submit : null,
-                  icon: const Icon(Icons.add_photo_alternate),
-                  label: const Text('Plaats op klasbord'),
+                  onPressed: canSubmit && !posting ? submit : null,
+                  icon: posting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.add_photo_alternate),
+                  label: Text(posting ? 'Bezig met plaatsen…' : 'Plaats op klasbord'),
                 ),
               ),
             ],
           ),
         ),
         const SizedBox(height: 14),
-        MediaCanvasBoard(items: items),
+        MediaCanvasBoard(
+          items: items,
+          onDelete: (item) async {
+            final target = item.boardItem;
+            if (target == null) return;
+            try {
+              await board.removeItem(target);
+            } catch (exception) {
+              _showError(exception);
+            }
+          },
+        ),
       ],
     );
   }
@@ -3545,34 +3589,53 @@ class _MediaCanvasBlockState extends State<MediaCanvasBlock> {
     setState(() => pickedFile = result.files.single);
   }
 
-  void submit() {
+  void _showError(Object exception) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$exception'.replaceFirst('Exception: ', ''))),
+    );
+  }
+
+  Future<void> submit() async {
     final link = linkController.text.trim();
     final note = noteController.text.trim();
-    if (link.isEmpty && pickedFile == null && note.isEmpty) return;
-    final kind = mediaKind(link: link, fileName: pickedFile?.name);
-    final fileName = pickedFile?.name;
+    final file = pickedFile;
+    if (link.isEmpty && file == null && note.isEmpty) return;
+    final kind = mediaKind(link: link, fileName: file?.name);
 
-    setState(() {
-      items.add(
-        CanvasMediaItem(
-          name: AppSession.current?.username ?? 'Gast',
-          note: note,
-          link: link,
-          fileName: fileName,
-          bytes: pickedFile?.bytes,
-          kind: kind,
-        ),
-      );
+    setState(() => posting = true);
+    try {
+      String? fileUrl;
+      if (file != null) {
+        final bytes = file.bytes;
+        if (bytes == null) throw Exception('Bestand kon niet gelezen worden.');
+        if (bytes.length > 10 * 1024 * 1024) {
+          throw Exception('Bestand is te groot (maximaal 10 MB).');
+        }
+        fileUrl = await BoardApi.upload(bytes, file.name);
+      }
+      await board.put('media', {
+        'kind': kind,
+        'note': note,
+        'link': link,
+        if (file != null) 'file_name': file.name,
+        if (fileUrl != null) 'file_url': fileUrl,
+      });
       linkController.clear();
       noteController.clear();
       pickedFile = null;
-    });
-    ActivityTracker(widget.blockContext).track('media_canvas_posted', {
-      'kind': kind,
-      'link': link,
-      'file_name': fileName ?? '',
-      'note': note,
-    });
+      ActivityTracker(widget.blockContext).track('media_canvas_posted', {
+        'kind': kind,
+        'link': link,
+        'file_name': file?.name ?? '',
+        'file_url': fileUrl ?? '',
+        'note': note,
+      });
+    } catch (exception) {
+      _showError(exception);
+    } finally {
+      if (mounted) setState(() => posting = false);
+    }
   }
 
   String mediaKind({required String link, String? fileName}) {
@@ -3603,7 +3666,8 @@ class CanvasMediaItem {
     required this.kind,
     this.link = '',
     this.fileName,
-    this.bytes,
+    this.fileUrl,
+    this.boardItem,
   });
 
   final String name;
@@ -3611,13 +3675,19 @@ class CanvasMediaItem {
   final String kind;
   final String link;
   final String? fileName;
-  final Uint8List? bytes;
+  final String? fileUrl;
+  final BoardItem? boardItem;
+
+  bool get canDelete =>
+      boardItem != null &&
+      (boardItem!.isMine || AppSession.current?.isAdmin == true);
 }
 
 class MediaCanvasBoard extends StatelessWidget {
-  const MediaCanvasBoard({super.key, required this.items});
+  const MediaCanvasBoard({super.key, required this.items, this.onDelete});
 
   final List<CanvasMediaItem> items;
+  final ValueChanged<CanvasMediaItem>? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -3715,21 +3785,40 @@ class MediaCanvasBoard extends StatelessWidget {
                       ),
                     ),
                     _kindBadge(item.kind),
+                    if (item.canDelete && onDelete != null)
+                      IconButton(
+                        tooltip: 'Verwijderen',
+                        visualDensity: VisualDensity.compact,
+                        iconSize: 18,
+                        onPressed: () => onDelete!(item),
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: Color(0xFF66716C),
+                        ),
+                      ),
                   ],
                 ),
                 if (item.note.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(item.note),
                 ],
-                if (item.link.isNotEmpty) ...[
+                if (item.link.isNotEmpty || item.fileUrl != null) ...[
                   const SizedBox(height: 10),
                   OutlinedButton.icon(
                     onPressed: () => launchUrl(
-                      Uri.parse(item.link),
+                      Uri.parse(
+                        item.link.isNotEmpty ? item.link : item.fileUrl!,
+                      ),
                       webOnlyWindowName: '_blank',
                     ),
                     icon: const Icon(Icons.open_in_new),
-                    label: const Text('Open link'),
+                    label: Text(
+                      item.link.isNotEmpty
+                          ? 'Open link'
+                          : item.kind == 'video'
+                          ? 'Bekijk video'
+                          : 'Open bestand',
+                    ),
                   ),
                 ],
               ],
@@ -3741,10 +3830,18 @@ class MediaCanvasBoard extends StatelessWidget {
   }
 
   Widget _preview(CanvasMediaItem item) {
-    if (item.bytes != null && item.kind == 'image') {
+    if (item.fileUrl != null && item.kind == 'image') {
       return AspectRatio(
         aspectRatio: 16 / 9,
-        child: Image.memory(item.bytes!, fit: BoxFit.cover),
+        child: Image.network(
+          item.fileUrl!,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => Container(
+            color: const Color(0xFFE9F1EC),
+            alignment: Alignment.center,
+            child: const Icon(Icons.broken_image, color: Color(0xFF365847)),
+          ),
+        ),
       );
     }
 
@@ -3990,22 +4087,50 @@ class ReadingPlanBlock extends StatefulWidget {
 }
 
 class _ReadingPlanBlockState extends State<ReadingPlanBlock> {
-  static final Map<String, Set<int>> _completedByPlan = {};
-  static final Map<String, List<Map<String, String>>> _boardByPlan = {};
+  late final SharedBoardController board;
 
-  String get planKey =>
-      widget.content['id'] as String? ??
-      (widget.content['title'] as String? ??
-              widget.content['intro'] as String? ??
-              '')
-          .hashCode
-          .toString();
+  String get scope => 'block:${widget.blockContext.blockId}';
 
-  Set<int> get completed =>
-      _completedByPlan.putIfAbsent(planKey, () => <int>{});
+  @override
+  void initState() {
+    super.initState();
+    board = SharedBoardController(scope)..addListener(_onBoard);
+  }
 
-  List<Map<String, String>> get boardEntries =>
-      _boardByPlan.putIfAbsent(planKey, () => <Map<String, String>>[]);
+  void _onBoard() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    board.removeListener(_onBoard);
+    board.dispose();
+    super.dispose();
+  }
+
+  /// Mijn gelezen dagen (index), uit de server.
+  Set<int> get completed => board
+      .ofKind('read')
+      .where((item) => item.isMine)
+      .map((item) => int.tryParse(item.key) ?? -1)
+      .where((index) => index >= 0)
+      .toSet();
+
+  /// Shoutoutwall: gemarkeerde verzen van de hele groep.
+  List<Map<String, String>> get boardEntries => board
+      .ofKind('read')
+      .map(
+        (item) => {
+          'id': '${item.userId}:read${item.key}',
+          'name': item.isMine
+              ? (AppSession.current?.username ?? item.username)
+              : item.username,
+          'label': '${item.data['day'] ?? ''}',
+          'answer':
+              '${item.data['reference']} vers ${item.data['verse']}: ${item.data['emoji']} ${item.data['text']}',
+        },
+      )
+      .toList();
 
   @override
   Widget build(BuildContext context) {
@@ -4118,6 +4243,8 @@ class _ReadingPlanBlockState extends State<ReadingPlanBlock> {
             ReadingPlanBoard(
               entries: boardEntries,
               question: shoutoutwallQuestion,
+              boardScope: '$scope:wall',
+              blockContext: widget.blockContext,
             ),
           ],
         ],
@@ -4125,29 +4252,34 @@ class _ReadingPlanBlockState extends State<ReadingPlanBlock> {
     );
   }
 
-  void _markReadingComplete(
+  Future<void> _markReadingComplete(
     ReadingPlanItem reading,
     BibleVerseMark mark,
     int total,
-  ) {
+  ) async {
     final meaningful = {'♥', '?', '!'}.contains(mark.emoji);
     if (!meaningful) return;
 
     final wasComplete = completed.contains(reading.index);
-    setState(() {
-      completed.add(reading.index);
-      final entry = {
-        'name': AppSession.current?.username ?? 'Gast',
-        'label': reading.dayLabel,
-        'answer':
-            '${reading.reference} vers ${mark.verse}: ${mark.emoji} ${mark.text}',
-      };
-      boardEntries.removeWhere(
-        (item) =>
-            item['name'] == entry['name'] && item['label'] == entry['label'],
-      );
-      boardEntries.add(entry);
-    });
+    try {
+      await board.put('read', {
+        'day': reading.dayLabel,
+        'reference': reading.reference,
+        'verse': mark.verse,
+        'emoji': mark.emoji,
+        'text': mark.text,
+      }, key: '${reading.index}');
+    } catch (exception) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$exception'.replaceFirst('Exception: ', '')),
+          ),
+        );
+      }
+      return;
+    }
+    final doneCount = completed.length;
 
     ActivityTracker(widget.blockContext).track('reading_plan_verse_marked', {
       'day': reading.dayLabel,
@@ -4156,9 +4288,9 @@ class _ReadingPlanBlockState extends State<ReadingPlanBlock> {
       'emoji': mark.emoji,
       'text': mark.text,
       'item_completed': !wasComplete,
-      'completed_count': completed.length,
+      'completed_count': doneCount,
       'total': total,
-      'block_completed': total > 0 && completed.length == total,
+      'block_completed': total > 0 && doneCount == total,
     });
   }
 
@@ -4312,10 +4444,14 @@ class ReadingPlanBoard extends StatelessWidget {
     super.key,
     required this.entries,
     required this.question,
+    this.boardScope,
+    this.blockContext,
   });
 
   final List<Map<String, String>> entries;
   final String question;
+  final String? boardScope;
+  final BlockContext? blockContext;
 
   @override
   Widget build(BuildContext context) {
@@ -4323,6 +4459,8 @@ class ReadingPlanBoard extends StatelessWidget {
       entries: entries,
       title: 'Shoutoutwall',
       emptyMessage: question,
+      boardScope: boardScope,
+      blockContext: blockContext,
     );
   }
 }
@@ -4696,22 +4834,96 @@ class BiblePassageView extends StatefulWidget {
 }
 
 class _BiblePassageViewState extends State<BiblePassageView> {
-  static final Map<String, Map<int, VerseAnnotation>> _annotations = {};
+  late final Future<Map<String, dynamic>> passageFuture;
+  SharedBoardController? board;
 
-  String get boardKey => '${widget.translation}:${widget.reference}';
+  String get scope =>
+      'bible:${widget.reference.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim()}';
 
-  Map<int, VerseAnnotation> get annotations =>
-      _annotations.putIfAbsent(boardKey, () => <int, VerseAnnotation>{});
+  @override
+  void initState() {
+    super.initState();
+    passageFuture = HouvastApi().getBiblePassage(
+      reference: widget.reference,
+      translation: widget.translation,
+    );
+    if (AppSession.current != null) {
+      board = SharedBoardController(scope)..addListener(_onBoard);
+    }
+  }
+
+  void _onBoard() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    board?.removeListener(_onBoard);
+    board?.dispose();
+    super.dispose();
+  }
+
+  VerseAnnotation _fromItem(BoardItem item) {
+    final color = item.data['color'];
+    return VerseAnnotation(
+      highlightColor: color is num ? Color(color.toInt()) : null,
+      note: '${item.data['note'] ?? ''}',
+      emoji: '${item.data['emoji'] ?? ''}',
+    );
+  }
+
+  /// Mijn eigen aantekeningen (kleuren de verzen).
+  Map<int, VerseAnnotation> get annotations => {
+    for (final item in board?.ofKind('annotation') ?? const <BoardItem>[])
+      if (item.isMine && int.tryParse(item.key) != null)
+        int.parse(item.key): _fromItem(item),
+  };
+
+  /// Alle aantekeningen van de groep (voor het leesbord).
+  List<SharedVerseAnnotation> get groupAnnotations => [
+    for (final item in board?.ofKind('annotation') ?? const <BoardItem>[])
+      if (int.tryParse(item.key) != null)
+        SharedVerseAnnotation(
+          verse: int.parse(item.key),
+          annotation: _fromItem(item),
+          name: item.isMine ? 'Jij' : item.username,
+          isMine: item.isMine,
+        ),
+  ];
+
+  Future<void> _saveAnnotation(int verse, VerseAnnotation annotation) async {
+    final shared = board;
+    if (shared == null) return;
+    try {
+      await shared.put('annotation', {
+        'color': annotation.highlightColor?.toARGB32(),
+        'note': annotation.note,
+        'emoji': annotation.emoji,
+      }, key: '$verse');
+    } catch (exception) {
+      _showError(exception);
+    }
+  }
+
+  Future<void> _clearAnnotation(int verse) async {
+    try {
+      await board?.removeKey('annotation', '$verse');
+    } catch (exception) {
+      _showError(exception);
+    }
+  }
+
+  void _showError(Object exception) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$exception'.replaceFirst('Exception: ', ''))),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final api = HouvastApi();
-
     return FutureBuilder<Map<String, dynamic>>(
-      future: api.getBiblePassage(
-        reference: widget.reference,
-        translation: widget.translation,
-      ),
+      future: passageFuture,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -4781,7 +4993,7 @@ class _BiblePassageViewState extends State<BiblePassageView> {
 
             if (index == verses.length + 1) {
               return BibleAnnotationBoard(
-                annotations: annotations,
+                annotations: groupAnnotations,
                 verses: verses,
               );
             }
@@ -4896,7 +5108,7 @@ class _BiblePassageViewState extends State<BiblePassageView> {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: ['?', '?', '!'].map((emoji) {
+                      children: ['♥', '?', '!'].map((emoji) {
                         final active = selectedEmoji == emoji;
                         return ChoiceChip(
                           selected: active,
@@ -4929,7 +5141,7 @@ class _BiblePassageViewState extends State<BiblePassageView> {
                       children: [
                         TextButton.icon(
                           onPressed: () {
-                            setState(() => annotations.remove(number));
+                            _clearAnnotation(number);
                             final blockContext = widget.blockContext;
                             if (blockContext != null) {
                               ActivityTracker(
@@ -4949,13 +5161,14 @@ class _BiblePassageViewState extends State<BiblePassageView> {
                         FilledButton.icon(
                           onPressed: () {
                             final note = noteController.text.trim();
-                            setState(() {
-                              annotations[number] = VerseAnnotation(
+                            _saveAnnotation(
+                              number,
+                              VerseAnnotation(
                                 highlightColor: selectedColor,
                                 note: note,
                                 emoji: selectedEmoji,
-                              );
-                            });
+                              ),
+                            );
                             final blockContext = widget.blockContext;
                             if (blockContext != null) {
                               ActivityTracker(
@@ -5001,6 +5214,20 @@ class _BiblePassageViewState extends State<BiblePassageView> {
   }
 }
 
+class SharedVerseAnnotation {
+  const SharedVerseAnnotation({
+    required this.verse,
+    required this.annotation,
+    required this.name,
+    required this.isMine,
+  });
+
+  final int verse;
+  final VerseAnnotation annotation;
+  final String name;
+  final bool isMine;
+}
+
 class BibleAnnotationBoard extends StatelessWidget {
   const BibleAnnotationBoard({
     super.key,
@@ -5008,7 +5235,7 @@ class BibleAnnotationBoard extends StatelessWidget {
     required this.verses,
   });
 
-  final Map<int, VerseAnnotation> annotations;
+  final List<SharedVerseAnnotation> annotations;
   final List<Map<String, dynamic>> verses;
 
   @override
@@ -5018,15 +5245,21 @@ class BibleAnnotationBoard extends StatelessWidget {
         verse['number'] as int: verse['text'] as String,
     };
     final items =
-        annotations.entries
+        annotations
             .where(
               (entry) =>
-                  entry.value.highlightColor != null ||
-                  entry.value.note.isNotEmpty ||
-                  entry.value.emoji.isNotEmpty,
+                  verseTextByNumber.containsKey(entry.verse) &&
+                  (entry.annotation.highlightColor != null ||
+                      entry.annotation.note.isNotEmpty ||
+                      entry.annotation.emoji.isNotEmpty),
             )
             .toList()
-          ..sort((a, b) => a.key.compareTo(b.key));
+          ..sort((a, b) {
+            final byVerse = a.verse.compareTo(b.verse);
+            if (byVerse != 0) return byVerse;
+            if (a.isMine != b.isMine) return a.isMine ? -1 : 1;
+            return a.name.compareTo(b.name);
+          });
 
     return Container(
       margin: const EdgeInsets.only(top: 8),
@@ -5041,6 +5274,11 @@ class BibleAnnotationBoard extends StatelessWidget {
           const Text(
             'Leesbord',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Highlights en notities van de hele groep bij dit gedeelte.',
+            style: TextStyle(color: Color(0xFFCFE0D6), fontSize: 13),
           ),
           const SizedBox(height: 12),
           if (items.isEmpty)
@@ -5062,7 +5300,7 @@ class BibleAnnotationBoard extends StatelessWidget {
               spacing: 10,
               runSpacing: 10,
               children: items.map((entry) {
-                final annotation = entry.value;
+                final annotation = entry.annotation;
                 return Container(
                   width: 250,
                   padding: const EdgeInsets.all(12),
@@ -5075,11 +5313,15 @@ class BibleAnnotationBoard extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Text(
-                            'Vers ${entry.key}',
-                            style: const TextStyle(fontWeight: FontWeight.w900),
+                          Expanded(
+                            child: Text(
+                              '${entry.name} · vers ${entry.verse}',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
                           ),
-                          const Spacer(),
                           if (annotation.emoji.isNotEmpty)
                             Text(
                               annotation.emoji,
@@ -5089,7 +5331,7 @@ class BibleAnnotationBoard extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        verseTextByNumber[entry.key] ?? '',
+                        verseTextByNumber[entry.verse] ?? '',
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 12.5, height: 1.35),
@@ -5314,6 +5556,8 @@ class _QuestionFlowState extends State<QuestionFlow> {
       final others = <Map<String, String>>[];
       _restoring = true;
       for (final item in answers) {
+        final flow = item['flow'] as String? ?? '';
+        if (flow.isNotEmpty && flow != widget.labelPrefix) continue;
         final index = (item['question_index'] as num).toInt() - 1;
         final answer = '${item['answer']}';
         if (index < 0 || index >= controllers.length) continue;
@@ -5324,6 +5568,7 @@ class _QuestionFlowState extends State<QuestionFlow> {
           }
         } else {
           others.add({
+            'id': '${item['user_id']}:${widget.labelPrefix}${index + 1}',
             'name': '${item['username']}',
             'label': '${widget.labelPrefix} ${index + 1}',
             'answer': answer,
@@ -5345,6 +5590,7 @@ class _QuestionFlowState extends State<QuestionFlow> {
       for (var index = 0; index < controllers.length; index++)
         if (_isValidAnswer(controllers[index].text))
           {
+            'id': '${AppSession.current?.userId ?? 'ik'}:${widget.labelPrefix}${index + 1}',
             'name': AppSession.current?.username ?? 'Ik',
             'label': '${widget.labelPrefix} ${index + 1}',
             'answer': controllers[index].text.trim(),
@@ -5377,6 +5623,44 @@ class _QuestionFlowState extends State<QuestionFlow> {
                   fontWeight: FontWeight.w800,
                 ),
               ),
+              if (widget.questions.length > 1) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: List.generate(widget.questions.length, (index) {
+                    final text = controllers[index].text.trim();
+                    final valid = _isValidAnswer(text);
+                    final started = text.isNotEmpty;
+                    final active = index == activeIndex;
+                    return ChoiceChip(
+                      selected: active,
+                      showCheckmark: false,
+                      visualDensity: VisualDensity.compact,
+                      avatar: Icon(
+                        valid
+                            ? Icons.check_circle
+                            : started
+                            ? Icons.edit
+                            : Icons.radio_button_unchecked,
+                        size: 16,
+                        color: valid
+                            ? const Color(0xFF247A4D)
+                            : started
+                            ? const Color(0xFF8A5B16)
+                            : const Color(0xFF9AA39F),
+                      ),
+                      label: Text('${index + 1}'),
+                      tooltip: valid
+                          ? 'Staat op het groepsbord'
+                          : started
+                          ? 'Nog te kort voor het groepsbord'
+                          : 'Nog niet beantwoord',
+                      onSelected: (_) => setState(() => activeIndex = index),
+                    );
+                  }),
+                ),
+              ],
               const SizedBox(height: 8),
               Text(question, style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 12),
@@ -5397,10 +5681,10 @@ class _QuestionFlowState extends State<QuestionFlow> {
                 const SizedBox(height: 8),
                 Text(
                   answerIsTooShort
-                      ? 'Schrijf nog ongeveer $remaining tekens, liefst als complete zin.'
+                      ? 'Nog niet op het groepsbord: schrijf nog ongeveer $remaining tekens.'
                       : activeText.isEmpty
                       ? 'Minimaal ${widget.minCharacters} tekens per antwoord.'
-                      : 'Mooi, dit is lang genoeg voor het groepsbord.',
+                      : 'Mooi, dit antwoord staat op het groepsbord.',
                   style: TextStyle(
                     color: answerIsTooShort
                         ? const Color(0xFF8A5B16)
@@ -5434,7 +5718,13 @@ class _QuestionFlowState extends State<QuestionFlow> {
           ),
         ),
         const SizedBox(height: 14),
-        BlackboardBubbles(entries: entries, blockContext: widget.blockContext),
+        BlackboardBubbles(
+          entries: entries,
+          blockContext: widget.blockContext,
+          boardScope: widget.blockContext == null
+              ? null
+              : 'block:${widget.blockContext!.blockId}',
+        ),
       ],
     );
   }
@@ -5462,6 +5752,7 @@ class _QuestionFlowState extends State<QuestionFlow> {
       }
       lastTrackedAnswers[index] = answer;
       await ActivityTracker(blockContext).track('question_answered', {
+        'flow': widget.labelPrefix,
         'question_index': index + 1,
         'question': widget.questions[index],
         'answer': answer,
@@ -5484,25 +5775,60 @@ class BlackboardBubbles extends StatefulWidget {
     this.blockContext,
     this.title = 'Groepsbord',
     this.emptyMessage,
+    this.boardScope,
   });
 
+  /// Elke entry: name, label, answer en (voor gedeelde reacties) id.
   final List<Map<String, String>> entries;
   final BlockContext? blockContext;
   final String title;
   final String? emptyMessage;
+
+  /// Scope op de server voor reacties en emoji's. Null = alleen lokaal.
+  final String? boardScope;
 
   @override
   State<BlackboardBubbles> createState() => _BlackboardBubblesState();
 }
 
 class _BlackboardBubblesState extends State<BlackboardBubbles> {
-  final Map<String, List<String>> replies = {};
-  final Map<String, List<String>> emojiReplies = {};
   final Map<String, TextEditingController> replyControllers = {};
+  final Map<String, List<String>> localReplies = {};
+  final Map<String, List<String>> localEmojis = {};
+  SharedBoardController? board;
   String? openReplyKey;
 
   @override
+  void initState() {
+    super.initState();
+    _attachBoard();
+  }
+
+  @override
+  void didUpdateWidget(covariant BlackboardBubbles oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.boardScope != widget.boardScope) {
+      board?.removeListener(_onBoard);
+      board?.dispose();
+      board = null;
+      _attachBoard();
+    }
+  }
+
+  void _attachBoard() {
+    final scope = widget.boardScope;
+    if (scope == null || scope.isEmpty) return;
+    board = SharedBoardController(scope)..addListener(_onBoard);
+  }
+
+  void _onBoard() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
+    board?.removeListener(_onBoard);
+    board?.dispose();
     for (final controller in replyControllers.values) {
       controller.dispose();
     }
@@ -5539,8 +5865,8 @@ class _BlackboardBubblesState extends State<BlackboardBubbles> {
           Text(
             widget.emptyMessage ??
                 (widget.entries.isEmpty
-                    ? 'Typ hierboven iets. Je antwoord verschijnt hier direct.'
-                    : 'Tik op een wolkje om op die persoon te reageren.'),
+                    ? 'Typ hierboven iets. Je antwoord verschijnt hier voor de hele groep.'
+                    : 'Tik op Reageer om op iemand te reageren.'),
             style: const TextStyle(color: Color(0xFFCFE0D6), fontSize: 13),
           ),
           const SizedBox(height: 12),
@@ -5583,7 +5909,31 @@ class _BlackboardBubblesState extends State<BlackboardBubbles> {
   }
 
   String _entryKey(Map<String, String> entry) {
+    final id = entry['id'];
+    if (id != null && id.isNotEmpty) return id;
     return '${entry['name']}|${entry['label']}|${entry['answer']}';
+  }
+
+  List<BoardItem> _repliesFor(String key) => (board?.ofKind('reply') ?? [])
+      .where((item) => item.data['target'] == key)
+      .toList();
+
+  List<String> _emojisFor(String key) {
+    if (board == null) return localEmojis[key] ?? const [];
+    return board!
+        .ofKind('emoji')
+        .where((item) => item.data['target'] == key)
+        .map((item) => '${item.data['emoji']}')
+        .toList();
+  }
+
+  Set<String> _myEmojisFor(String key) {
+    if (board == null) return const {};
+    return board!
+        .ofKind('emoji')
+        .where((item) => item.data['target'] == key && item.isMine)
+        .map((item) => '${item.data['emoji']}')
+        .toSet();
   }
 
   Widget _bubble(Map<String, String> entry, String key) {
@@ -5591,8 +5941,11 @@ class _BlackboardBubblesState extends State<BlackboardBubbles> {
       key,
       () => TextEditingController(),
     );
-    final itemReplies = replies[key] ?? const [];
     final isOpen = openReplyKey == key;
+    final sharedReplies = _repliesFor(key);
+    final ownLocalReplies = board == null
+        ? (localReplies[key] ?? const <String>[])
+        : const <String>[];
 
     return Container(
       padding: const EdgeInsets.all(13),
@@ -5644,13 +5997,9 @@ class _BlackboardBubblesState extends State<BlackboardBubbles> {
             label: Text(isOpen ? 'Sluiten' : 'Reageer'),
           ),
           EmojiReactionBar(
-            selected: emojiReplies[key] ?? const [],
-            onEmoji: (emoji) {
-              setState(() {
-                emojiReplies.putIfAbsent(key, () => <String>[]).add(emoji);
-              });
-              _trackBoardAction('blackboard_emoji', entry, {'emoji': emoji});
-            },
+            selected: _emojisFor(key),
+            mine: _myEmojisFor(key),
+            onEmoji: (emoji) => _toggleEmoji(entry, key, emoji),
           ),
           if (isOpen) ...[
             const SizedBox(height: 8),
@@ -5673,47 +6022,69 @@ class _BlackboardBubblesState extends State<BlackboardBubbles> {
                 ),
               ),
             ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton(
-                onPressed: () => _submitReply(entry, key, controller),
-                child: const Text('Plaats'),
-              ),
-            ),
           ],
-          if (itemReplies.isNotEmpty) ...[
+          if (sharedReplies.isNotEmpty || ownLocalReplies.isNotEmpty) ...[
             const Divider(height: 18),
-            ...itemReplies.map(
-              (reply) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE9F1EC),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Jij reageert',
-                        style: TextStyle(
-                          color: Color(0xFF365847),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(reply),
-                    ],
-                  ),
-                ),
+            ...sharedReplies.map(
+              (reply) => _replyCard(
+                reply.isMine ? 'Jij' : reply.username,
+                '${reply.data['text'] ?? ''}',
+                canDelete: reply.isMine || AppSession.current?.isAdmin == true,
+                onDelete: () => _deleteReply(reply),
               ),
             ),
+            ...ownLocalReplies.map((text) => _replyCard('Jij', text)),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _replyCard(
+    String name,
+    String text, {
+    bool canDelete = false,
+    VoidCallback? onDelete,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(10, 8, 4, 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE9F1EC),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      color: Color(0xFF365847),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(text),
+                ],
+              ),
+            ),
+            if (canDelete)
+              IconButton(
+                tooltip: 'Verwijder reactie',
+                visualDensity: VisualDensity.compact,
+                iconSize: 18,
+                onPressed: onDelete,
+                icon: const Icon(Icons.close, color: Color(0xFF66716C)),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -5747,19 +6118,73 @@ class _BlackboardBubblesState extends State<BlackboardBubbles> {
     });
   }
 
-  void _submitReply(
+  void _showError(Object exception) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$exception'.replaceFirst('Exception: ', ''))),
+    );
+  }
+
+  Future<void> _toggleEmoji(
+    Map<String, String> entry,
+    String key,
+    String emoji,
+  ) async {
+    final shared = board;
+    if (shared == null) {
+      setState(() => localEmojis.putIfAbsent(key, () => []).add(emoji));
+      _trackBoardAction('blackboard_emoji', entry, {'emoji': emoji});
+      return;
+    }
+    final itemKey = '$key|$emoji';
+    try {
+      if (_myEmojisFor(key).contains(emoji)) {
+        await shared.removeKey('emoji', itemKey);
+      } else {
+        await shared.put('emoji', {
+          'target': key,
+          'emoji': emoji,
+        }, key: itemKey);
+        _trackBoardAction('blackboard_emoji', entry, {'emoji': emoji});
+      }
+    } catch (exception) {
+      _showError(exception);
+    }
+  }
+
+  Future<void> _submitReply(
     Map<String, String> entry,
     String key,
     TextEditingController controller,
-  ) {
+  ) async {
     final text = controller.text.trim();
     if (text.isEmpty) return;
-    setState(() {
-      replies.putIfAbsent(key, () => []).add(text);
-      controller.clear();
-      openReplyKey = null;
-    });
+    final shared = board;
+    if (shared == null) {
+      setState(() {
+        localReplies.putIfAbsent(key, () => []).add(text);
+        controller.clear();
+        openReplyKey = null;
+      });
+    } else {
+      try {
+        await shared.put('reply', {'target': key, 'text': text});
+        controller.clear();
+        setState(() => openReplyKey = null);
+      } catch (exception) {
+        _showError(exception);
+        return;
+      }
+    }
     _trackBoardAction('blackboard_reply', entry, {'reply': text});
+  }
+
+  Future<void> _deleteReply(BoardItem reply) async {
+    try {
+      await board?.removeItem(reply);
+    } catch (exception) {
+      _showError(exception);
+    }
   }
 }
 
@@ -5768,9 +6193,11 @@ class EmojiReactionBar extends StatelessWidget {
     super.key,
     required this.selected,
     required this.onEmoji,
+    this.mine = const {},
   });
 
   final List<String> selected;
+  final Set<String> mine;
   final ValueChanged<String> onEmoji;
 
   static const emojis = ['👍', '❤️', '🙏', '💡', '❓'];
@@ -5787,17 +6214,24 @@ class EmojiReactionBar extends StatelessWidget {
       runSpacing: 6,
       children: emojis.map((emoji) {
         final count = counts[emoji] ?? 0;
+        final isMine = mine.contains(emoji);
         return InkWell(
           onTap: () => onEmoji(emoji),
           borderRadius: BorderRadius.circular(999),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
             decoration: BoxDecoration(
-              color: count > 0
+              color: isMine
+                  ? const Color(0xFFCFE6D7)
+                  : count > 0
                   ? const Color(0xFFE9F1EC)
                   : const Color(0xFFF8F6EF),
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: const Color(0xFFE3DED2)),
+              border: Border.all(
+                color: isMine
+                    ? const Color(0xFF247A4D)
+                    : const Color(0xFFE3DED2),
+              ),
             ),
             child: Text(
               count > 0 ? '$emoji $count' : emoji,
@@ -5811,7 +6245,8 @@ class EmojiReactionBar extends StatelessWidget {
 }
 
 class _DistributionBlockState extends State<DistributionBlock> {
-  static final Map<String, List<Map<String, dynamic>>> _groupSubmissions = {};
+  late final SharedBoardController board;
+  bool _restored = false;
 
   late final int targetTotal;
   late final String unit;
@@ -5834,14 +6269,33 @@ class _DistributionBlockState extends State<DistributionBlock> {
       for (final option in options)
         option['id'] as String: option['default'] as int? ?? 0,
     };
-    boardKey =
-        widget.content['id'] as String? ??
-        widget.content['prompt'] as String? ??
-        identityHashCode(widget.content).toString();
+    boardKey = 'block:${widget.blockContext.blockId}';
+    board = SharedBoardController(boardKey)..addListener(_onBoard);
+  }
+
+  void _onBoard() {
+    if (!mounted) return;
+    if (!_restored && board.loaded) {
+      _restored = true;
+      final mine = board.mine('distribution', 'me');
+      if (mine != null) {
+        final saved = (mine.data['values'] as Map?) ?? const {};
+        for (final entry in saved.entries) {
+          if (values.containsKey('${entry.key}')) {
+            values['${entry.key}'] = (entry.value as num?)?.toInt() ?? 0;
+          }
+        }
+        explanationController.text = '${mine.data['explanation'] ?? ''}';
+        submitted = true;
+      }
+    }
+    setState(() {});
   }
 
   @override
   void dispose() {
+    board.removeListener(_onBoard);
+    board.dispose();
     explanationController.dispose();
     super.dispose();
   }
@@ -5855,8 +6309,18 @@ class _DistributionBlockState extends State<DistributionBlock> {
     final prompt = widget.content['prompt'] as String?;
     final afterPrompt = widget.content['after_prompt'] as String?;
     final shareWithGroup = widget.content['share_with_group'] as bool? ?? true;
-    final submissions =
-        _groupSubmissions[boardKey] ?? const <Map<String, dynamic>>[];
+    final submissions = board
+        .ofKind('distribution')
+        .where((item) => item.data['shared'] != false)
+        .map(
+          (item) => <String, dynamic>{
+            'user_id': item.userId,
+            'name': item.isMine ? 'Jij' : item.username,
+            'values': item.data['values'] ?? const {},
+            'explanation': item.data['explanation'] ?? '',
+          },
+        )
+        .toList();
     final explanationRequired = afterPrompt?.trim().isNotEmpty == true;
     final explanationReady =
         !explanationRequired || explanationController.text.trim().length >= 20;
@@ -5969,6 +6433,7 @@ class _DistributionBlockState extends State<DistributionBlock> {
             unit: unit,
             options: options,
             submissions: submissions,
+            board: board,
             blockContext: widget.blockContext,
           ),
         ],
@@ -6060,30 +6525,32 @@ class _DistributionBlockState extends State<DistributionBlock> {
     return (value / step).round() * step;
   }
 
-  void _submitDistribution(bool shareWithGroup) {
-    setState(() {
-      submitted = true;
-      if (shareWithGroup) {
-        final submission = {
-          'name': AppSession.current?.username ?? 'Gast',
-          'values': Map<String, int>.from(values),
-          'explanation': explanationController.text.trim(),
-        };
-        final list = _groupSubmissions.putIfAbsent(
-          boardKey,
-          () => <Map<String, dynamic>>[],
+  Future<void> _submitDistribution(bool shareWithGroup) async {
+    final explanation = explanationController.text.trim();
+    try {
+      await board.put('distribution', {
+        'values': Map<String, int>.from(values),
+        'explanation': explanation,
+        'shared': shareWithGroup,
+      }, key: 'me');
+    } catch (exception) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$exception'.replaceFirst('Exception: ', '')),
+          ),
         );
-        list.removeWhere((item) => item['name'] == submission['name']);
-        list.add(submission);
       }
-    });
+      return;
+    }
+    if (mounted) setState(() => submitted = true);
     ActivityTracker(widget.blockContext).track('distribution_submitted', {
       'values': Map<String, int>.from(values),
       'total': total,
       'target_total': targetTotal,
       'unit': unit,
       'shared_with_group': shareWithGroup,
-      'explanation': explanationController.text.trim(),
+      'explanation': explanation,
       'completed': true,
     });
   }
@@ -6125,12 +6592,14 @@ class DistributionGroupBoard extends StatefulWidget {
     required this.unit,
     required this.options,
     required this.submissions,
+    required this.board,
     required this.blockContext,
   });
 
   final String unit;
   final List<Map<String, dynamic>> options;
   final List<Map<String, dynamic>> submissions;
+  final SharedBoardController board;
   final BlockContext blockContext;
 
   @override
@@ -6138,7 +6607,49 @@ class DistributionGroupBoard extends StatefulWidget {
 }
 
 class _DistributionGroupBoardState extends State<DistributionGroupBoard> {
-  final Map<String, List<String>> emojiReplies = {};
+  List<String> _emojisFor(String target) => widget.board
+      .ofKind('emoji')
+      .where((item) => item.data['target'] == target)
+      .map((item) => '${item.data['emoji']}')
+      .toList();
+
+  Set<String> _myEmojisFor(String target) => widget.board
+      .ofKind('emoji')
+      .where((item) => item.data['target'] == target && item.isMine)
+      .map((item) => '${item.data['emoji']}')
+      .toSet();
+
+  Future<void> _toggleEmoji(
+    String target,
+    Map<String, dynamic> submission,
+    Map<String, int> values,
+    String emoji,
+  ) async {
+    final key = '$target|$emoji';
+    try {
+      if (_myEmojisFor(target).contains(emoji)) {
+        await widget.board.removeKey('emoji', key);
+      } else {
+        await widget.board.put('emoji', {
+          'target': target,
+          'emoji': emoji,
+        }, key: key);
+        ActivityTracker(widget.blockContext).track('distribution_emoji', {
+          'target_name': submission['name'] as String? ?? '',
+          'target_values': values,
+          'emoji': emoji,
+        });
+      }
+    } catch (exception) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$exception'.replaceFirst('Exception: ', '')),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -6200,7 +6711,7 @@ class _DistributionGroupBoardState extends State<DistributionGroupBoard> {
   }
 
   Widget _submissionCard(Map<String, dynamic> submission) {
-    final key = '${submission['name']}|${submission['values']}';
+    final key = 'dist:${submission['user_id'] ?? submission['name']}';
     final explanation = submission['explanation'] as String? ?? '';
     final values = (submission['values'] as Map).map(
       (key, value) =>
@@ -6251,17 +6762,9 @@ class _DistributionGroupBoardState extends State<DistributionGroupBoard> {
           ],
           const SizedBox(height: 4),
           EmojiReactionBar(
-            selected: emojiReplies[key] ?? const [],
-            onEmoji: (emoji) {
-              setState(() {
-                emojiReplies.putIfAbsent(key, () => <String>[]).add(emoji);
-              });
-              ActivityTracker(widget.blockContext).track('distribution_emoji', {
-                'target_name': submission['name'] as String? ?? '',
-                'target_values': values,
-                'emoji': emoji,
-              });
-            },
+            selected: _emojisFor(key),
+            mine: _myEmojisFor(key),
+            onEmoji: (emoji) => _toggleEmoji(key, submission, values, emoji),
           ),
         ],
       ),
