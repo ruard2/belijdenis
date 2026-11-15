@@ -1,23 +1,30 @@
 {
-    "name": "frontend",
-    "short_name": "frontend",
-    "start_url": ".",
+    "id": "/",
+    "name": "Houvast – Samen God leren kennen",
+    "short_name": "Houvast",
+    "description": "Catechese-app: samen God leren kennen.",
+    "lang": "nl",
+    "start_url": "/",
+    "scope": "/",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "display_override": ["standalone", "minimal-ui"],
+    "background_color": "#F7F3EA",
+    "theme_color": "#365847",
+    "orientation": "any",
+    "categories": ["education", "books"],
     "prefer_related_applications": false,
     "icons": [
         {
             "src": "icons/Icon-192.png",
             "sizes": "192x192",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
         },
         {
             "src": "icons/Icon-512.png",
             "sizes": "512x512",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
         },
         {
             "src": "icons/Icon-maskable-192.png",

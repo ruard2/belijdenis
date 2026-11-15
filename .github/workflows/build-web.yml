@@ -1,0 +1,62 @@
+name: Build Flutter web
+
+# Bouwt de Flutter web-app en commit de build naar backend/frontend/build/web
+# (die map wordt door FastAPI/Railway geserveerd).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/lib/**'
+      - 'frontend/web/**'
+      - 'frontend/pubspec.yaml'
+      - 'frontend/pubspec.lock'
+      - '.github/workflows/build-web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-web
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Pub get
+        working-directory: frontend
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: frontend
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Build web
+        working-directory: frontend
+        run: flutter build web --release --base-href /
+
+      - name: Copy build
+        run: |
+          rm -rf backend/frontend/build/web
+          mkdir -p backend/frontend/build
+          cp -r frontend/build/web backend/frontend/build/web
+
+      - name: Commit build
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -f backend/frontend/build/web frontend/build/web
+          if git diff --cached --quiet; then
+            echo "Geen wijzigingen in build."
+          else
+            git commit -m "Build Flutter web [skip ci]"
+            git push
+          fi

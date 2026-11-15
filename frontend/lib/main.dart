@@ -1650,15 +1650,25 @@ class BlockPreview extends StatelessWidget {
       widgets.add(_callout(content['callout'] as String));
     }
 
-    if (content['reference'] is String) {
-      widgets.add(_tagRow(['Bijbelgedeelte: ${content['reference']}']));
+    if (content['reference'] is String &&
+        (content['reference'] as String).trim().isNotEmpty) {
+      widgets.add(_sectionTitle(context, 'Bijbelgedeelte'));
+      widgets.add(
+        BibleReferenceChips(
+          references: [content['reference'] as String],
+          blockContext: blockContext,
+        ),
+      );
     }
 
     if (content['references'] is List) {
       widgets.add(_sectionTitle(context, 'Teksten'));
       widgets.add(
-        _tagRow(
-          (content['references'] as List).map((item) => '$item').toList(),
+        BibleReferenceChips(
+          references: (content['references'] as List)
+              .map((item) => '$item')
+              .toList(),
+          blockContext: blockContext,
         ),
       );
     }
@@ -1755,37 +1765,6 @@ class BlockPreview extends StatelessWidget {
     );
   }
 
-  Widget _tagRow(List<String> tags) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: tags
-            .map(
-              (tag) => Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE9F1EC),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  tag,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            )
-            .toList(),
-      ),
-    );
-  }
-
   Widget _bulletList(List<String> items) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -1873,30 +1852,9 @@ class DeepDiveBlock extends StatelessWidget {
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: references
-                .map(
-                  (reference) => Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE9F1EC),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      reference,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
+          BibleReferenceChips(
+            references: references,
+            blockContext: blockContext,
           ),
         ],
       ],
@@ -3923,6 +3881,78 @@ class BibleBlock extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Klikbare bijbeltekst-chips: openen de bijbellezer (zelfde als leesrooster).
+class BibleReferenceChips extends StatelessWidget {
+  const BibleReferenceChips({
+    super.key,
+    required this.references,
+    this.blockContext,
+  });
+
+  final List<String> references;
+  final BlockContext? blockContext;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = references
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: items
+            .map(
+              (reference) => ActionChip(
+                avatar: const Icon(
+                  Icons.menu_book,
+                  size: 16,
+                  color: Color(0xFF365847),
+                ),
+                label: Text(
+                  reference,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                backgroundColor: const Color(0xFFE9F1EC),
+                side: BorderSide.none,
+                shape: const StadiumBorder(),
+                tooltip: 'Open $reference',
+                onPressed: () => openBibleReference(
+                  context,
+                  reference,
+                  blockContext: blockContext,
+                ),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+}
+
+Future<void> openBibleReference(
+  BuildContext context,
+  String reference, {
+  BlockContext? blockContext,
+}) async {
+  if (blockContext != null) {
+    ActivityTracker(blockContext).track('bible_opened', {
+      'reference': reference,
+    });
+  }
+  await showDialog<void>(
+    context: context,
+    builder: (_) =>
+        BibleReaderDialog(reference: reference, blockContext: blockContext),
+  );
 }
 
 class BibleReaderDialog extends StatelessWidget {

@@ -1,46 +1,126 @@
 <!DOCTYPE html>
-<html>
+<html lang="nl">
 <head>
   <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
+    $FLUTTER_BASE_HREF wordt bij `flutter build web` vervangen door --base-href.
   -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Houvast – samen God leren kennen.">
+  <meta name="theme-color" content="#365847">
 
-  <!-- iOS meta tags & icons -->
+  <!-- Installeerbaar als app (Android / Chrome / desktop) -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="frontend">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <meta name="application-name" content="Houvast">
 
-  <!-- Favicon -->
+  <!-- iOS: 'Zet op beginscherm' -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Houvast">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+
   <link rel="icon" type="image/png" href="favicon.png"/>
-
-  <title>frontend</title>
+  <title>Houvast</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    html, body { background: #F7F3EA; margin: 0; }
+    #houvast-install {
+      position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom));
+      transform: translateX(-50%); z-index: 2147483647;
+      display: none; align-items: center; gap: 12px;
+      max-width: calc(100vw - 32px); box-sizing: border-box;
+      padding: 12px 12px 12px 14px; border-radius: 12px;
+      background: #24302F; color: #fff;
+      font: 14px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      box-shadow: 0 8px 28px rgba(0,0,0,.25);
+    }
+    #houvast-install.show { display: flex; }
+    #houvast-install img { width: 36px; height: 36px; border-radius: 8px; flex: none; }
+    #houvast-install .txt { flex: 1; }
+    #houvast-install .txt b { display: block; font-size: 15px; }
+    #houvast-install button {
+      border: 0; border-radius: 8px; cursor: pointer; font: inherit; font-weight: 700;
+    }
+    #houvast-install .go { background: #F7F3EA; color: #24302F; padding: 9px 14px; }
+    #houvast-install .x { background: transparent; color: #cfd8d3; padding: 6px 8px; font-size: 18px; }
+    #houvast-install .share {
+      display: inline-block; vertical-align: -3px; width: 16px; height: 16px;
+    }
+  </style>
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
+  <div id="houvast-install" role="dialog" aria-label="Installeer Houvast">
+    <img src="icons/Icon-192.png" alt="">
+    <div class="txt" id="houvast-install-text">
+      <b>Installeer Houvast</b>Zet de app op je beginscherm.
+    </div>
+    <button class="go" id="houvast-install-go" type="button">Installeren</button>
+    <button class="x" id="houvast-install-close" type="button" aria-label="Sluiten">&times;</button>
+  </div>
 
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
+  <script>
+    (function () {
+      var KEY = 'houvast_install_dismissed_at';
+      var banner = document.getElementById('houvast-install');
+      var goBtn = document.getElementById('houvast-install-go');
+      var text = document.getElementById('houvast-install-text');
+      var deferred = null;
+
+      function standalone() {
+        return window.matchMedia('(display-mode: standalone)').matches ||
+          window.navigator.standalone === true;
+      }
+      function recentlyDismissed() {
+        try {
+          var t = parseInt(localStorage.getItem(KEY) || '0', 10);
+          return Date.now() - t < 7 * 24 * 3600 * 1000;
+        } catch (e) { return false; }
+      }
+      function show() { if (!standalone() && !recentlyDismissed()) banner.classList.add('show'); }
+      function hide() { banner.classList.remove('show'); }
+
+      document.getElementById('houvast-install-close').onclick = function () {
+        try { localStorage.setItem(KEY, String(Date.now())); } catch (e) {}
+        hide();
+      };
+
+      // Android / Chrome / Edge: native installatieprompt
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        deferred = e;
+        goBtn.style.display = '';
+        show();
+      });
+      goBtn.onclick = async function () {
+        if (!deferred) return;
+        deferred.prompt();
+        try { await deferred.userChoice; } catch (e) {}
+        deferred = null;
+        hide();
+      };
+      window.addEventListener('appinstalled', hide);
+
+      // iOS Safari: geen prompt mogelijk, dus uitleg tonen
+      var ua = navigator.userAgent;
+      var isIOS = /iPad|iPhone|iPod/.test(ua) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (isIOS && !standalone()) {
+        var shareIcon = '<svg class="share" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" ' +
+          'stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="M7 8l5-5 5 5"/>' +
+          '<path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>';
+        text.innerHTML = '<b>Installeer Houvast</b>Tik op ' + shareIcon +
+          ' <b style="display:inline;font-size:inherit">Deel</b> en kies ' +
+          '<b style="display:inline;font-size:inherit">Zet op beginscherm</b>.';
+        goBtn.style.display = 'none';
+        setTimeout(show, 2500);
+      }
+    })();
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

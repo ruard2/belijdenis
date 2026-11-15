@@ -38,10 +38,23 @@ _flutter.buildConfig = {"engineRevision":"c416acfeb8126e097f758c664aaa3da929e27d
 
 (async () => {
   if ('serviceWorker' in navigator) {
+    // Oude Flutter service workers opruimen (voorkomt verouderde cache),
+    // maar de PWA-service worker behouden zodat de app installeerbaar blijft.
     const registrations = await navigator.serviceWorker.getRegistrations();
     await Promise.all(
-      registrations.map((registration) => registration.unregister()),
+      registrations
+        .filter((registration) => {
+          const worker =
+            registration.active || registration.waiting || registration.installing;
+          return !(worker && worker.scriptURL.endsWith('/pwa-sw.js'));
+        })
+        .map((registration) => registration.unregister()),
     );
+    try {
+      await navigator.serviceWorker.register('pwa-sw.js', { scope: './' });
+    } catch (error) {
+      console.warn('PWA service worker registratie mislukt', error);
+    }
   }
 
   await _flutter.loader.load();
