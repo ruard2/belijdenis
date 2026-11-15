@@ -13,6 +13,7 @@ import 'auth_token.dart';
 import 'shared_board.dart';
 import 'bible_translation_preferences_stub.dart'
     if (dart.library.html) 'bible_translation_preferences_web.dart';
+import 'video_embed.dart';
 import 'youtube_embed_stub.dart'
     if (dart.library.html) 'youtube_embed_web.dart';
 
@@ -2222,8 +2223,41 @@ class BlockPreview extends StatelessWidget {
       );
     }
 
-    final url = content['url'] as String? ?? '';
-    if (url.isNotEmpty) {
+    final url = (content['url'] as String? ?? '').trim();
+    if (url.isNotEmpty && isEmbeddableVideo(url)) {
+      final videoLabel =
+          content['link_label'] as String? ??
+          content['button_label'] as String?;
+      if (videoLabel?.trim().isNotEmpty == true) {
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 8),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.smart_display,
+                  size: 20,
+                  color: Color(0xFF5F7A6A),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    videoLabel!.trim(),
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: buildYoutubeEmbed(url),
+        ),
+      );
+    } else if (url.isNotEmpty) {
       final linkLabel =
           content['link_label'] as String? ??
           content['button_label'] as String?;
@@ -3297,7 +3331,8 @@ class _MediaBlockState extends State<MediaBlock> {
   Widget build(BuildContext context) {
     final url = widget.content['url'] as String? ?? '';
     final intro = widget.content['intro'] as String? ?? '';
-    final isYoutube = widget.type == 'youtube' && url.isNotEmpty;
+    final isYoutube =
+        url.isNotEmpty && (widget.type == 'youtube' || isEmbeddableVideo(url));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
