@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'admin_builder.dart';
+import 'auth_token.dart';
 import 'bible_translation_preferences_stub.dart'
     if (dart.library.html) 'bible_translation_preferences_web.dart';
 import 'youtube_embed_stub.dart'
@@ -89,12 +92,28 @@ class HouvastApp extends StatelessWidget {
   }
 }
 
+class ApiException implements Exception {
+  ApiException(this.statusCode, this.message);
+
+  final int statusCode;
+  final String message;
+
+  bool get isUnauthorized => statusCode == 401;
+  bool get isForbidden => statusCode == 403;
+
+  @override
+  String toString() => message;
+}
+
 class HouvastApi {
-  Future<AppSession> loginGuest({String? name}) async {
+  Future<AppSession> login({
+    required String username,
+    required String pin,
+  }) async {
     final response = await http.post(
-      Uri.parse('$apiBaseUrl/auth/guest'),
+      Uri.parse('$apiBaseUrl/auth/login'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'name': name ?? ''}),
+      body: jsonEncode({'username': username.trim(), 'pin': pin.trim()}),
     );
     _ensureOk(response);
     return AppSession.fromJson(
@@ -114,8 +133,49 @@ class HouvastApi {
     );
   }
 
+  Future<AppSession> me(String token) async {
+    final response = await http.get(
+      Uri.parse('$apiBaseUrl/auth/me'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    _ensureOk(response);
+    return AppSession.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<void> logout() async {
+    try {
+      await http.post(
+        Uri.parse('$apiBaseUrl/auth/logout'),
+        headers: AuthToken.headers(),
+      );
+    } catch (_) {}
+  }
+
+  Future<Map<String, dynamic>> getProgress() async {
+    final response = await http.get(
+      Uri.parse('$apiBaseUrl/me/progress'),
+      headers: AuthToken.headers(),
+    );
+    _ensureOk(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> completeChapter(String chapterId) async {
+    final response = await http.post(
+      Uri.parse('$apiBaseUrl/me/chapters/$chapterId/complete'),
+      headers: AuthToken.headers(),
+    );
+    _ensureOk(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   Future<List<dynamic>> getCourses() async {
-    final response = await http.get(Uri.parse('$apiBaseUrl/courses'));
+    final response = await http.get(
+      Uri.parse('$apiBaseUrl/courses'),
+      headers: AuthToken.headers(),
+    );
     _ensureOk(response);
     return jsonDecode(response.body) as List<dynamic>;
   }
@@ -123,6 +183,7 @@ class HouvastApi {
   Future<List<dynamic>> getChapters(String courseId) async {
     final response = await http.get(
       Uri.parse('$apiBaseUrl/courses/$courseId/chapters'),
+      headers: AuthToken.headers(),
     );
     _ensureOk(response);
     return jsonDecode(response.body) as List<dynamic>;
@@ -131,6 +192,7 @@ class HouvastApi {
   Future<Map<String, dynamic>> getChapter(String chapterId) async {
     final response = await http.get(
       Uri.parse('$apiBaseUrl/chapters/$chapterId'),
+      headers: AuthToken.headers(),
     );
     _ensureOk(response);
     return jsonDecode(response.body) as Map<String, dynamic>;
@@ -169,7 +231,7 @@ class HouvastApi {
 
     final response = await http.post(
       Uri.parse('$apiBaseUrl/activity'),
-      headers: {'Content-Type': 'application/json'},
+      headers: AuthToken.headers(json: true),
       body: jsonEncode({
         'session_id': session.sessionId,
         'user_id': session.userId,
@@ -188,7 +250,14 @@ class HouvastApi {
 
   void _ensureOk(http.Response response) {
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('API fout ${response.statusCode}: ${response.body}');
+      var message = 'Er ging iets mis (${response.statusCode}).';
+      try {
+        final body = jsonDecode(response.body);
+        if (body is Map && body['detail'] is String) {
+          message = body['detail'] as String;
+        }
+      } catch (_) {}
+      throw ApiException(response.statusCode, message);
     }
   }
 }
@@ -199,26 +268,37 @@ class AppSession {
     required this.userId,
     required this.username,
     required this.role,
+    this.loginName = '',
   });
 
   final String sessionId;
   final String userId;
   final String username;
   final String role;
+  final String loginName;
 
+  String get token => sessionId;
   bool get isAdmin => role == 'admin';
-  bool get isGuest => role == 'guest';
 
   static AppSession? current;
 
   factory AppSession.fromJson(Map<String, dynamic> json) {
     return AppSession(
-      sessionId: json['session_id'] as String,
+      sessionId: (json['token'] ?? json['session_id']) as String,
       userId: json['user_id'] as String,
       username: json['username'] as String,
       role: json['role'] as String,
+      loginName: json['login_name'] as String? ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'token': sessionId,
+    'user_id': userId,
+    'username': username,
+    'role': role,
+    'login_name': loginName,
+  };
 }
 
 class ActivityTracker {
@@ -229,7 +309,11 @@ class ActivityTracker {
 
   Future<void> track(String action, Map<String, dynamic> value) async {
     if (_marksBlockComplete(action, value)) {
+      final wasComplete = LessonProgress.instance.isContextComplete(context);
       final awardedXp = LessonProgress.instance.markComplete(context);
+      if (!wasComplete) {
+        value = {...value, 'block_completed': true};
+      }
       if (awardedXp > 0) {
         value = {
           ...value,
@@ -334,6 +418,22 @@ class LessonProgress extends ChangeNotifier {
     return 0;
   }
 
+  void loadFromServer(Map<String, dynamic> progress) {
+    _completed.clear();
+    _xpByKey.clear();
+    for (final item in (progress['completed_blocks'] as List<dynamic>? ?? [])) {
+      final map = item as Map<String, dynamic>;
+      _completed.add(_key('${map['chapter_id']}', '${map['block_id']}'));
+    }
+    for (final item in (progress['xp'] as List<dynamic>? ?? [])) {
+      final map = item as Map<String, dynamic>;
+      final key = _key('${map['chapter_id']}', '${map['block_id']}');
+      _completed.add(key);
+      _xpByKey[key] = (map['xp'] as num?)?.toInt() ?? 0;
+    }
+    notifyListeners();
+  }
+
   void clear() {
     if (_completed.isEmpty && _xpByKey.isEmpty) return;
     _completed.clear();
@@ -379,21 +479,45 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    loading = false;
+    _restoreSession();
+  }
+
+  Future<void> _restoreSession() async {
+    final stored = AuthToken.loadPersisted();
+    if (stored == null || stored.isEmpty) {
+      setState(() => loading = false);
+      return;
+    }
+    try {
+      final saved = AppSession.fromJson(
+        jsonDecode(stored) as Map<String, dynamic>,
+      );
+      final fresh = await api.me(saved.token);
+      await _setSession(fresh);
+    } catch (_) {
+      AuthToken.clear();
+      if (mounted) setState(() => loading = false);
+    }
   }
 
   Future<void> _setSession(AppSession nextSession) async {
     AppSession.current = nextSession;
+    AuthToken.value = nextSession.token;
+    AuthToken.persist(jsonEncode(nextSession.toJson()));
     LessonProgress.instance.clear();
     setState(() {
       session = nextSession;
+      selectedChapter = null;
+      adminMode = false;
       loading = true;
     });
     await loadInitialData();
   }
 
-  void _logout() {
+  Future<void> _logout() async {
+    await api.logout();
     AppSession.current = null;
+    AuthToken.clear();
     LessonProgress.instance.clear();
     setState(() {
       session = null;
@@ -402,22 +526,15 @@ class _HomeScreenState extends State<HomeScreen> {
       courses = [];
       chapters = [];
       selectedCourse = null;
+      loading = false;
+      error = null;
     });
   }
 
   Future<void> _openAdmin() async {
     if (session?.isAdmin == true) {
       setState(() => adminMode = true);
-      return;
     }
-
-    final adminSession = await showDialog<AppSession>(
-      context: context,
-      builder: (_) => const AdminLoginDialog(),
-    );
-    if (adminSession == null) return;
-    await _setSession(adminSession);
-    setState(() => adminMode = true);
   }
 
   Future<void> loadInitialData() async {
@@ -432,11 +549,23 @@ class _HomeScreenState extends State<HomeScreen> {
       final loadedChapters = firstCourse == null
           ? <dynamic>[]
           : await api.getChapters(firstCourse['id'] as String);
+      try {
+        LessonProgress.instance.loadFromServer(await api.getProgress());
+      } catch (_) {}
 
       setState(() {
         courses = loadedCourses;
         selectedCourse = firstCourse;
         chapters = loadedChapters;
+        loading = false;
+      });
+    } on ApiException catch (exception) {
+      if (exception.isUnauthorized) {
+        await _logout();
+        return;
+      }
+      setState(() {
+        error = exception.toString();
         loading = false;
       });
     } catch (exception) {
@@ -447,7 +576,23 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _reloadChapters() async {
+    final courseId = selectedCourse?['id'] as String?;
+    if (courseId == null) return;
+    final loaded = await api.getChapters(courseId);
+    if (mounted) setState(() => chapters = loaded);
+  }
+
   Future<void> openChapter(String chapterId) async {
+    final summary = chapters.cast<Map<String, dynamic>>().firstWhere(
+      (chapter) => chapter['id'] == chapterId,
+      orElse: () => <String, dynamic>{},
+    );
+    if (summary['locked'] == true) {
+      _showLockedMessage(summary);
+      return;
+    }
+
     setState(() {
       loading = true;
       error = null;
@@ -455,23 +600,92 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       final chapter = await api.getChapter(chapterId);
-      await api.recordActivity(
-        courseId: chapter['course_id'] as String? ?? '',
-        chapterId: chapter['id'] as String? ?? chapterId,
-        blockId: '',
-        blockType: 'chapter',
-        action: 'chapter_opened',
-        value: {'title': chapter['title'] as String? ?? ''},
-      );
       setState(() {
         selectedChapter = chapter;
         loading = false;
       });
+      unawaited(
+        api
+            .recordActivity(
+              courseId: chapter['course_id'] as String? ?? '',
+              chapterId: chapter['id'] as String? ?? chapterId,
+              blockId: '',
+              blockType: 'chapter',
+              action: 'chapter_opened',
+              value: {'title': chapter['title'] as String? ?? ''},
+            )
+            .catchError((_) {}),
+      );
+    } on ApiException catch (exception) {
+      setState(() => loading = false);
+      if (exception.isUnauthorized) {
+        await _logout();
+      } else if (exception.isForbidden) {
+        _showLockedMessage(summary);
+        await _reloadChapters();
+      } else {
+        setState(() => error = exception.toString());
+      }
     } catch (exception) {
       setState(() {
         error = exception.toString();
         loading = false;
       });
+    }
+  }
+
+  void _showLockedMessage(Map<String, dynamic> chapter) {
+    final order = chapter['sort_order'] as int? ?? 0;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          order > 1
+              ? 'Rond eerst hoofdstuk ${order - 1} af. Daarna gaat dit hoofdstuk open.'
+              : 'Dit hoofdstuk is nog niet open.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> completeChapter() async {
+    final chapter = selectedChapter;
+    if (chapter == null) return;
+    final chapterId = chapter['id'] as String;
+    try {
+      final result = await api.completeChapter(chapterId);
+      await _reloadChapters();
+      if (!mounted) return;
+      setState(() {
+        selectedChapter = {...chapter, 'completed': true};
+      });
+      final next = result['next_chapter'] as Map<String, dynamic>?;
+      final openNext = await showDialog<bool>(
+        context: context,
+        builder: (context) => ChapterCompletedDialog(
+          chapterTitle: chapter['title'] as String? ?? '',
+          nextChapter: next,
+        ),
+      );
+      if (openNext == true && next != null) {
+        await openChapter(next['id'] as String);
+      } else if (openNext == false) {
+        closeChapter();
+      }
+    } on ApiException catch (exception) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(exception.message)));
+    }
+  }
+
+  Future<void> openNextAfter(String chapterId) async {
+    final list = chapters.cast<Map<String, dynamic>>();
+    final index = list.indexWhere((chapter) => chapter['id'] == chapterId);
+    if (index >= 0 && index + 1 < list.length) {
+      await openChapter(list[index + 1]['id'] as String);
+    } else {
+      closeChapter();
     }
   }
 
@@ -484,7 +698,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (session == null) {
       return Scaffold(
         body: SafeArea(
-          child: LoginScreen(api: api, onLogin: _setSession),
+          child: loading
+              ? const Center(child: CircularProgressIndicator())
+              : LoginScreen(api: api, onLogin: _setSession),
         ),
       );
     }
@@ -531,14 +747,69 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (selectedChapter != null) {
-      return ChapterDetail(chapter: selectedChapter!, onBack: closeChapter);
+      final chapterId = selectedChapter!['id'] as String? ?? '';
+      final summary = chapters.cast<Map<String, dynamic>>().firstWhere(
+        (chapter) => chapter['id'] == chapterId,
+        orElse: () => <String, dynamic>{},
+      );
+      final list = chapters.cast<Map<String, dynamic>>();
+      final index = list.indexWhere((chapter) => chapter['id'] == chapterId);
+      return ChapterDetail(
+        key: ValueKey(chapterId),
+        chapter: selectedChapter!,
+        onBack: closeChapter,
+        isCompleted:
+            summary['completed'] == true ||
+            selectedChapter!['completed'] == true,
+        hasNextChapter: index >= 0 && index + 1 < list.length,
+        onComplete: completeChapter,
+        onNext: () => openNextAfter(chapterId),
+      );
     }
 
     return CourseDashboard(
       courses: courses,
       chapters: chapters,
       selectedCourse: selectedCourse,
+      session: session!,
       onOpenChapter: openChapter,
+    );
+  }
+}
+
+class ChapterCompletedDialog extends StatelessWidget {
+  const ChapterCompletedDialog({
+    super.key,
+    required this.chapterTitle,
+    required this.nextChapter,
+  });
+
+  final String chapterTitle;
+  final Map<String, dynamic>? nextChapter;
+
+  @override
+  Widget build(BuildContext context) {
+    final next = nextChapter;
+    return AlertDialog(
+      icon: const Icon(Icons.celebration, color: Color(0xFF247A4D), size: 40),
+      title: const Text('Hoofdstuk afgerond!'),
+      content: Text(
+        next == null
+            ? 'Je hebt "$chapterTitle" afgerond. Dit was het laatste hoofdstuk dat nu beschikbaar is.'
+            : 'Je hebt "$chapterTitle" afgerond.\n\nHoofdstuk ${next['sort_order']}: "${next['title']}" is nu open.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Naar overzicht'),
+        ),
+        if (next != null)
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.arrow_forward),
+            label: const Text('Volgend hoofdstuk'),
+          ),
+      ],
     );
   }
 }
@@ -554,120 +825,145 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final nameController = TextEditingController();
+  final usernameController = TextEditingController();
+  final pinController = TextEditingController();
   final passwordController = TextEditingController();
   bool loading = false;
+  bool showAdmin = false;
   String? error;
 
   @override
   void dispose() {
-    nameController.dispose();
+    usernameController.dispose();
+    pinController.dispose();
     passwordController.dispose();
     super.dispose();
+  }
+
+  InputDecoration _decoration(String label, {String? hint, IconData? icon}) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: icon == null ? null : Icon(icon),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
+          constraints: const BoxConstraints(maxWidth: 420),
           child: Card(
             child: Padding(
               padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF24302F),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'H',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 22,
-                          ),
+              child: AutofillGroup(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const HouvastLogo(size: 56),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Houvast',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const Text(
+                      'Samen God leren kennen',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Color(0xFF66716C)),
+                    ),
+                    const SizedBox(height: 24),
+                    if (!showAdmin) ...[
+                      TextField(
+                        controller: usernameController,
+                        autofillHints: const [AutofillHints.username],
+                        textInputAction: TextInputAction.next,
+                        autocorrect: false,
+                        decoration: _decoration(
+                          'Gebruikersnaam',
+                          hint: 'Bijv. janv',
+                          icon: Icons.person_outline,
                         ),
                       ),
-                      const SizedBox(width: 14),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Houvast',
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            Text(
-                              'Log in of ga tijdelijk verder als gast',
-                              style: TextStyle(color: Color(0xFF66716C)),
-                            ),
-                          ],
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: pinController,
+                        autofillHints: const [AutofillHints.password],
+                        keyboardType: TextInputType.number,
+                        obscureText: true,
+                        maxLength: 6,
+                        decoration: _decoration(
+                          'Pincode',
+                          hint: '6 cijfers',
+                          icon: Icons.pin_outlined,
+                        ).copyWith(counterText: ''),
+                        onSubmitted: (_) => _login(),
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: loading ? null : _login,
+                        icon: const Icon(Icons.login),
+                        label: const Text('Inloggen'),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Je gebruikersnaam en pincode krijg je van je catecheet.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFF66716C),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ] else ...[
+                      TextField(
+                        controller: passwordController,
+                        obscureText: true,
+                        autofocus: true,
+                        decoration: _decoration(
+                          'Admin-wachtwoord',
+                          icon: Icons.admin_panel_settings_outlined,
+                        ),
+                        onSubmitted: (_) => _loginAdmin(),
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: loading ? null : _loginAdmin,
+                        icon: const Icon(Icons.admin_panel_settings),
+                        label: const Text('Inloggen als beheerder'),
+                      ),
+                    ],
+                    if (error != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        error!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Color(0xFF9E3E2F),
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 22),
-                  TextField(
-                    controller: nameController,
-                    decoration: InputDecoration(
-                      labelText: 'Naam voor op het groepsbord',
-                      hintText: 'Bijv. Ruard',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton.icon(
-                    onPressed: loading ? null : _continueAsGuest,
-                    icon: const Icon(Icons.person_outline),
-                    label: const Text('Verder als gast'),
-                  ),
-                  const SizedBox(height: 18),
-                  const Divider(),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: passwordController,
-                    obscureText: true,
-                    decoration: InputDecoration(
-                      labelText: 'Admin-wachtwoord',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    onSubmitted: (_) => _loginAdmin(),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: loading ? null : _loginAdmin,
-                    icon: const Icon(Icons.admin_panel_settings),
-                    label: const Text('Inloggen als admin'),
-                  ),
-                  if (error != null) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      error!,
-                      style: const TextStyle(
-                        color: Color(0xFF9E3E2F),
-                        fontWeight: FontWeight.w700,
+                    const SizedBox(height: 14),
+                    TextButton(
+                      onPressed: loading
+                          ? null
+                          : () => setState(() {
+                              showAdmin = !showAdmin;
+                              error = null;
+                            }),
+                      child: Text(
+                        showAdmin ? '← Terug naar inloggen' : 'Beheerder?',
                       ),
                     ),
                   ],
-                ],
+                ),
               ),
             ),
           ),
@@ -676,8 +972,13 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Future<void> _continueAsGuest() async {
-    await _run(() => widget.api.loginGuest(name: nameController.text));
+  Future<void> _login() async {
+    await _run(
+      () => widget.api.login(
+        username: usernameController.text,
+        pin: pinController.text,
+      ),
+    );
   }
 
   Future<void> _loginAdmin() async {
@@ -690,7 +991,9 @@ class _LoginScreenState extends State<LoginScreen> {
       error = null;
     });
     try {
-      widget.onLogin(await action());
+      final session = await action();
+      TextInput.finishAutofillContext();
+      widget.onLogin(session);
     } catch (exception) {
       setState(() {
         error = exception.toString();
@@ -700,63 +1003,37 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class AdminLoginDialog extends StatefulWidget {
-  const AdminLoginDialog({super.key});
+class HouvastLogo extends StatelessWidget {
+  const HouvastLogo({super.key, this.size = 40});
 
-  @override
-  State<AdminLoginDialog> createState() => _AdminLoginDialogState();
-}
-
-class _AdminLoginDialogState extends State<AdminLoginDialog> {
-  final api = HouvastApi();
-  final passwordController = TextEditingController();
-  String? error;
-
-  @override
-  void dispose() {
-    passwordController.dispose();
-    super.dispose();
-  }
+  final double size;
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Admin openen'),
-      content: SizedBox(
-        width: 320,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: passwordController,
-              obscureText: true,
-              autofocus: true,
-              decoration: const InputDecoration(labelText: 'Wachtwoord'),
-              onSubmitted: (_) => _login(),
+    return Center(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(size * 0.22),
+        child: Image.network(
+          'icons/Icon-192.png',
+          width: size,
+          height: size,
+          errorBuilder: (_, _, _) => Container(
+            width: size,
+            height: size,
+            alignment: Alignment.center,
+            color: const Color(0xFF365847),
+            child: Text(
+              'H',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: size * 0.5,
+              ),
             ),
-            if (error != null) ...[
-              const SizedBox(height: 8),
-              Text(error!, style: const TextStyle(color: Color(0xFF9E3E2F))),
-            ],
-          ],
+          ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Annuleren'),
-        ),
-        FilledButton(onPressed: _login, child: const Text('Open admin')),
-      ],
     );
-  }
-
-  Future<void> _login() async {
-    try {
-      Navigator.of(context).pop(await api.loginAdmin(passwordController.text));
-    } catch (exception) {
-      setState(() => error = exception.toString());
-    }
   }
 }
 
@@ -774,94 +1051,73 @@ class AppTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final narrow = MediaQuery.sizeOf(context).width < 600;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 18),
+      padding: EdgeInsets.symmetric(
+        horizontal: narrow ? 14 : 28,
+        vertical: narrow ? 10 : 16,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: Color(0xFFE3DED2))),
       ),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: const Color(0xFF24302F),
-              borderRadius: BorderRadius.circular(8),
+          HouvastLogo(size: narrow ? 34 : 40),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Houvast',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+                if (!narrow)
+                  const Text(
+                    'Samen God leren kennen',
+                    style: TextStyle(fontSize: 13, color: Color(0xFF66716C)),
+                  ),
+              ],
             ),
-            child: const Text(
-              'H',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: 20,
+          ),
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0ECE2),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                session.isAdmin ? '${session.username} · admin' : session.username,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ),
-          const SizedBox(width: 14),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Houvast',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-              ),
-              Text(
-                'Samen God leren kennen',
-                style: TextStyle(fontSize: 13, color: Color(0xFF66716C)),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0ECE2),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              '${session.username} (${session.isAdmin ? 'admin' : 'gast'})',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
-            ),
-          ),
-          const SizedBox(width: 8),
-          TextButton.icon(
-            onPressed: onAdmin,
-            icon: const Icon(Icons.construction),
-            label: const Text('Admin'),
-          ),
+          if (session.isAdmin) ...[
+            const SizedBox(width: 4),
+            narrow
+                ? IconButton(
+                    tooltip: 'Beheer',
+                    onPressed: onAdmin,
+                    icon: const Icon(Icons.construction),
+                  )
+                : TextButton.icon(
+                    onPressed: onAdmin,
+                    icon: const Icon(Icons.construction),
+                    label: const Text('Beheer'),
+                  ),
+          ],
           IconButton(
             tooltip: 'Uitloggen',
             onPressed: onLogout,
             icon: const Icon(Icons.logout),
           ),
-          const SizedBox(width: 8),
-          const ApiStatusPill(),
         ],
-      ),
-    );
-  }
-}
-
-class ApiStatusPill extends StatelessWidget {
-  const ApiStatusPill({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE9F1EC),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: const Text(
-        'API: 127.0.0.1:8000',
-        style: TextStyle(
-          color: Color(0xFF365847),
-          fontWeight: FontWeight.w700,
-          fontSize: 12,
-        ),
       ),
     );
   }
@@ -873,18 +1129,22 @@ class CourseDashboard extends StatelessWidget {
     required this.courses,
     required this.chapters,
     required this.selectedCourse,
+    required this.session,
     required this.onOpenChapter,
   });
 
   final List<dynamic> courses;
   final List<dynamic> chapters;
   final Map<String, dynamic>? selectedCourse;
+  final AppSession session;
   final ValueChanged<String> onOpenChapter;
 
   @override
   Widget build(BuildContext context) {
+    final chapterMaps = chapters.cast<Map<String, dynamic>>();
+    final narrowPage = MediaQuery.sizeOf(context).width < 600;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(28),
+      padding: EdgeInsets.all(narrowPage ? 14 : 28),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1120),
@@ -894,13 +1154,18 @@ class CourseDashboard extends StatelessWidget {
               LayoutBuilder(
                 builder: (context, constraints) {
                   final narrow = constraints.maxWidth < 840;
+                  final progress = MyProgressPanel(
+                    chapters: chapterMaps,
+                    session: session,
+                    onOpenChapter: onOpenChapter,
+                  );
                   if (narrow) {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         HeroPanel(course: selectedCourse, chapters: chapters),
                         const SizedBox(height: 18),
-                        AdminPreviewPanel(courseCount: courses.length),
+                        progress,
                       ],
                     );
                   }
@@ -917,10 +1182,7 @@ class CourseDashboard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 18),
-                        Expanded(
-                          flex: 2,
-                          child: AdminPreviewPanel(courseCount: courses.length),
-                        ),
+                        Expanded(flex: 2, child: progress),
                       ],
                     ),
                   );
@@ -932,18 +1194,28 @@ class CourseDashboard extends StatelessWidget {
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               const SizedBox(height: 12),
-              Wrap(
-                spacing: 16,
-                runSpacing: 16,
-                children: chapters
-                    .cast<Map<String, dynamic>>()
-                    .map(
-                      (chapter) => ChapterCard(
-                        chapter: chapter,
-                        onOpen: () => onOpenChapter(chapter['id'] as String),
-                      ),
-                    )
-                    .toList(),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final cardWidth = constraints.maxWidth < 720
+                      ? constraints.maxWidth
+                      : 340.0;
+                  return Wrap(
+                    spacing: 16,
+                    runSpacing: 16,
+                    children: chapterMaps
+                        .map(
+                          (chapter) => SizedBox(
+                            width: cardWidth,
+                            child: ChapterCard(
+                              chapter: chapter,
+                              onOpen: () =>
+                                  onOpenChapter(chapter['id'] as String),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  );
+                },
               ),
             ],
           ),
@@ -961,8 +1233,9 @@ class HeroPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final narrow = MediaQuery.sizeOf(context).width < 600;
     return Container(
-      padding: const EdgeInsets.all(28),
+      padding: EdgeInsets.all(narrow ? 20 : 28),
       decoration: BoxDecoration(
         color: const Color(0xFF24302F),
         borderRadius: BorderRadius.circular(8),
@@ -970,19 +1243,11 @@ class HeroPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Leerling-app',
-            style: TextStyle(
-              color: Color(0xFFBFD5C7),
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 24),
           Text(
             course?['title'] as String? ?? 'Cursus laden...',
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
-              fontSize: 36,
+              fontSize: narrow ? 28 : 36,
               fontWeight: FontWeight.w800,
               height: 1.05,
             ),
@@ -996,7 +1261,7 @@ class HeroPanel extends StatelessWidget {
               height: 1.45,
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
           ProgressStrip(chapters: chapters),
         ],
       ),
@@ -1012,21 +1277,16 @@ class ProgressStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chapterMaps = chapters.cast<Map<String, dynamic>>();
-    final blockCount = chapterMaps.fold<int>(
-      0,
-      (sum, chapter) => sum + (chapter['block_count'] as int? ?? 0),
-    );
-    final xpTotal = chapterMaps.fold<int>(
-      0,
-      (sum, chapter) => sum + (chapter['xp'] as int? ?? 0),
-    );
+    final done = chapterMaps.where((c) => c['completed'] == true).length;
 
-    return Row(
-      children: [
-        _metric('${chapters.length}', 'hoofdstukken'),
-        _metric('$blockCount', 'blocks'),
-        _metric('$xpTotal', 'XP'),
-      ],
+    return AnimatedBuilder(
+      animation: LessonProgress.instance,
+      builder: (context, _) => Row(
+        children: [
+          _metric('$done/${chapters.length}', 'hoofdstukken'),
+          _metric('${LessonProgress.instance.totalXp}', 'XP verdiend'),
+        ],
+      ),
     );
   }
 
@@ -1061,44 +1321,79 @@ class ProgressStrip extends StatelessWidget {
   }
 }
 
-class AdminPreviewPanel extends StatelessWidget {
-  const AdminPreviewPanel({super.key, required this.courseCount});
+class MyProgressPanel extends StatelessWidget {
+  const MyProgressPanel({
+    super.key,
+    required this.chapters,
+    required this.session,
+    required this.onOpenChapter,
+  });
 
-  final int courseCount;
+  final List<Map<String, dynamic>> chapters;
+  final AppSession session;
+  final ValueChanged<String> onOpenChapter;
 
   @override
   Widget build(BuildContext context) {
+    final done = chapters.where((c) => c['completed'] == true).length;
+    final current = chapters
+        .where((c) => c['completed'] != true && c['locked'] != true)
+        .firstOrNull;
+    final allDone = chapters.isNotEmpty && done == chapters.length;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Admin-CMS', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              'Welkom, ${session.username}',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 12),
-            const Text(
-              'Deze frontend leest nu seed-content uit de backend. Straks beheert de catecheet dezelfde structuur via het CMS.',
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: chapters.isEmpty ? 0 : done / chapters.length,
+                minHeight: 10,
+                backgroundColor: const Color(0xFFE9F1EC),
+                color: const Color(0xFF247A4D),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '$done van ${chapters.length} hoofdstukken afgerond',
+              style: const TextStyle(color: Color(0xFF66716C)),
             ),
             const SizedBox(height: 18),
-            _check('Content komt uit API'),
-            _check('Hoofdstukken niet hardcoded'),
-            _check('Blocks generiek renderbaar'),
-            _check('$courseCount cursus actief'),
+            if (allDone)
+              const Text(
+                'Je hebt alle beschikbare hoofdstukken afgerond. Goed gedaan!',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              )
+            else if (current != null) ...[
+              Text(
+                done == 0 ? 'Begin hier' : 'Ga verder met',
+                style: const TextStyle(
+                  color: Color(0xFF66716C),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Hoofdstuk ${current['sort_order']}: ${current['title']}',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: () => onOpenChapter(current['id'] as String),
+                icon: const Icon(Icons.play_arrow),
+                label: Text(done == 0 ? 'Start' : 'Verder'),
+              ),
+            ],
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _check(String label) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          const Icon(Icons.check_circle, color: Color(0xFF5F7A6A), size: 20),
-          const SizedBox(width: 10),
-          Expanded(child: Text(label)),
-        ],
       ),
     );
   }
@@ -1112,10 +1407,27 @@ class ChapterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 340,
+    final locked = chapter['locked'] == true;
+    final completed = chapter['completed'] == true;
+    final statusColor = completed
+        ? const Color(0xFF247A4D)
+        : locked
+        ? const Color(0xFF9AA39F)
+        : const Color(0xFF24302F);
+
+    return Opacity(
+      opacity: locked ? 0.6 : 1,
       child: Card(
         clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(
+            color: completed
+                ? const Color(0xFF247A4D)
+                : const Color(0xFFE3DED2),
+            width: completed ? 2 : 1,
+          ),
+        ),
         child: InkWell(
           onTap: onOpen,
           child: Padding(
@@ -1134,7 +1446,14 @@ class ChapterCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const Icon(Icons.chevron_right, color: Color(0xFF5F7A6A)),
+                    Icon(
+                      completed
+                          ? Icons.check_circle
+                          : locked
+                          ? Icons.lock_outline
+                          : Icons.chevron_right,
+                      color: statusColor,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -1143,27 +1462,31 @@ class ChapterCard extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 6),
-                Text(chapter['subtitle'] as String),
+                Text(chapter['subtitle'] as String? ?? ''),
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    _pill('${chapter['block_count']} blocks'),
-                    const SizedBox(width: 8),
-                    _pill('${chapter['xp']} XP'),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.play_arrow,
+                    Icon(
+                      completed
+                          ? Icons.replay
+                          : locked
+                          ? Icons.lock_outline
+                          : Icons.play_arrow,
                       size: 20,
-                      color: Color(0xFF24302F),
+                      color: statusColor,
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      'Open les',
-                      style: Theme.of(context).textTheme.titleMedium,
+                    Expanded(
+                      child: Text(
+                        completed
+                            ? 'Afgerond · opnieuw bekijken'
+                            : locked
+                            ? 'Nog op slot'
+                            : 'Open les',
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleMedium?.copyWith(color: statusColor),
+                      ),
                     ),
                   ],
                 ),
@@ -1174,27 +1497,25 @@ class ChapterCard extends StatelessWidget {
       ),
     );
   }
-
-  Widget _pill(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0ECE2),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-      ),
-    );
-  }
 }
 
 class ChapterDetail extends StatefulWidget {
-  const ChapterDetail({super.key, required this.chapter, required this.onBack});
+  const ChapterDetail({
+    super.key,
+    required this.chapter,
+    required this.onBack,
+    required this.isCompleted,
+    required this.hasNextChapter,
+    required this.onComplete,
+    required this.onNext,
+  });
 
   final Map<String, dynamic> chapter;
   final VoidCallback onBack;
+  final bool isCompleted;
+  final bool hasNextChapter;
+  final Future<void> Function() onComplete;
+  final VoidCallback onNext;
 
   @override
   State<ChapterDetail> createState() => _ChapterDetailState();
@@ -1244,7 +1565,9 @@ class _ChapterDetailState extends State<ChapterDetail> {
           routeEntries,
         );
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(28),
+          padding: EdgeInsets.all(
+            MediaQuery.sizeOf(context).width < 600 ? 12 : 28,
+          ),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 900),
@@ -1334,6 +1657,17 @@ class _ChapterDetailState extends State<ChapterDetail> {
                       ),
                     );
                   }),
+                  const SizedBox(height: 12),
+                  ChapterFinishPanel(
+                    completedCount: completedRouteCount,
+                    totalCount: routeEntries.length,
+                    isCompleted: widget.isCompleted,
+                    hasNextChapter: widget.hasNextChapter,
+                    onComplete: widget.onComplete,
+                    onNext: widget.onNext,
+                    onBack: widget.onBack,
+                  ),
+                  const SizedBox(height: 40),
                 ],
               ),
             ),
@@ -1345,6 +1679,157 @@ class _ChapterDetailState extends State<ChapterDetail> {
 
   bool _isFixedIntroBlock(Map<String, dynamic> block) {
     return block['type'] == 'hero' || block['type'] == 'reading_plan';
+  }
+}
+
+class ChapterFinishPanel extends StatefulWidget {
+  const ChapterFinishPanel({
+    super.key,
+    required this.completedCount,
+    required this.totalCount,
+    required this.isCompleted,
+    required this.hasNextChapter,
+    required this.onComplete,
+    required this.onNext,
+    required this.onBack,
+  });
+
+  final int completedCount;
+  final int totalCount;
+  final bool isCompleted;
+  final bool hasNextChapter;
+  final Future<void> Function() onComplete;
+  final VoidCallback onNext;
+  final VoidCallback onBack;
+
+  @override
+  State<ChapterFinishPanel> createState() => _ChapterFinishPanelState();
+}
+
+class _ChapterFinishPanelState extends State<ChapterFinishPanel> {
+  bool busy = false;
+
+  Future<void> _complete() async {
+    final open = widget.totalCount - widget.completedCount;
+    if (open > 0) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Nog niet alles gedaan'),
+          content: Text(
+            open == 1
+                ? 'Er staat nog 1 onderdeel open in de lesroute. Wil je het hoofdstuk toch afronden?'
+                : 'Er staan nog $open onderdelen open in de lesroute. Wil je het hoofdstuk toch afronden?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Nog even verder'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Toch afronden'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+    setState(() => busy = true);
+    try {
+      await widget.onComplete();
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final done = widget.isCompleted;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: done ? const Color(0xFFE9F4EC) : const Color(0xFF24302F),
+        borderRadius: BorderRadius.circular(10),
+        border: done
+            ? Border.all(color: const Color(0xFF247A4D), width: 2)
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                done ? Icons.check_circle : Icons.flag_outlined,
+                color: done ? const Color(0xFF247A4D) : Colors.white,
+                size: 28,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  done ? 'Hoofdstuk afgerond' : 'Klaar met dit hoofdstuk?',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: done ? const Color(0xFF24302F) : Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            done
+                ? 'Je hebt dit hoofdstuk afgerond. Je kunt het altijd opnieuw bekijken.'
+                : 'Lesroute: ${widget.completedCount} van ${widget.totalCount} onderdelen gedaan. '
+                      'Heb je alles gedaan? Rond het hoofdstuk af, dan gaat het volgende hoofdstuk open.',
+            style: TextStyle(
+              color: done ? const Color(0xFF3D4A47) : const Color(0xFFDCE6E0),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: done
+                ? [
+                    if (widget.hasNextChapter)
+                      FilledButton.icon(
+                        onPressed: widget.onNext,
+                        icon: const Icon(Icons.arrow_forward),
+                        label: const Text('Volgend hoofdstuk'),
+                      ),
+                    OutlinedButton.icon(
+                      onPressed: widget.onBack,
+                      icon: const Icon(Icons.grid_view),
+                      label: const Text('Naar overzicht'),
+                    ),
+                  ]
+                : [
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFF7F3EA),
+                        foregroundColor: const Color(0xFF24302F),
+                      ),
+                      onPressed: busy ? null : _complete,
+                      icon: busy
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.check),
+                      label: const Text(
+                        'Ik heb alles gedaan – hoofdstuk afronden',
+                      ),
+                    ),
+                  ],
+          ),
+        ],
+      ),
+    );
   }
 }
 

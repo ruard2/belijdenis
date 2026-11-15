@@ -2,11 +2,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:houvast_frontend/main.dart';
 
 void main() {
-  testWidgets('Houvast app renders shell', (WidgetTester tester) async {
+  testWidgets('Houvast toont inlogscherm', (WidgetTester tester) async {
     await tester.pumpWidget(const HouvastApp());
+    await tester.pump();
 
     expect(find.text('Houvast'), findsOneWidget);
-    expect(find.text('Verder als gast'), findsOneWidget);
-    expect(find.text('Inloggen als admin'), findsOneWidget);
+    expect(find.text('Inloggen'), findsOneWidget);
+    expect(find.text('Beheerder?'), findsOneWidget);
   });
 }

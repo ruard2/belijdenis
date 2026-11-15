@@ -4,7 +4,7 @@ name: Build Flutter web
 # (die map wordt door FastAPI/Railway geserveerd).
 on:
   push:
-    branches: [main]
+    branches: ['**']
     paths:
       - 'frontend/lib/**'
       - 'frontend/web/**'
@@ -17,7 +17,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: build-web
+  group: build-web-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -58,5 +58,5 @@ jobs:
             echo "Geen wijzigingen in build."
           else
             git commit -m "Build Flutter web"
-            git push
+            git push origin HEAD:${{ github.ref_name }}
           fi
