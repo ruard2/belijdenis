@@ -10,12 +10,14 @@ from fastapi.staticfiles import StaticFiles
 
 from app.activity_store import (
     list_activity,
+    list_block_answers,
     list_xp_awards,
     record_activity,
 )
 from app.auth_store import (
     AuthError,
     UserNotFoundError,
+    active_user_ids,
     admin_password_is_default,
     annotate_chapters,
     create_user,
@@ -105,9 +107,9 @@ async def prevent_stale_frontend_cache(request, call_next):
     response = await call_next(request)
     path = request.url.path
     if path == "/" or path.endswith((".html", ".js", ".json")):
-        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
+        # Altijd bij de server checken (ETag -> 304), maar wel cachen:
+        # scheelt ~4 MB download per app-start op telefoons.
+        response.headers["Cache-Control"] = "no-cache"
     return response
 
 
@@ -223,6 +225,14 @@ def activity(payload: dict, session: dict = Depends(require_session)) -> dict:
             session["user_id"], str(payload.get("chapter_id", "")), str(payload.get("block_id", ""))
         )
     return result
+
+
+@app.get("/blocks/{block_id}/answers")
+def block_answers(block_id: str, session: dict = Depends(require_session)) -> list[dict]:
+    answers = list_block_answers(block_id)
+    # Gedeactiveerde/verwijderde gebruikers en oude gastsessies niet tonen.
+    valid = active_user_ids() | {"admin", session["user_id"]}
+    return [a for a in answers if a["user_id"] in valid]
 
 
 @app.get("/me/progress")

@@ -522,3 +522,9 @@ __all__ = [
     "update_user",
     "uses_postgres",
 ]
+
+
+def active_user_ids() -> set[str]:
+    with connect() as connection:
+        rows = connection.execute("SELECT id FROM users WHERE active = 1").fetchall()
+    return {row["id"] for row in rows}

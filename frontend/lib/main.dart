@@ -153,6 +153,15 @@ class HouvastApi {
     } catch (_) {}
   }
 
+  Future<List<dynamic>> getBlockAnswers(String blockId) async {
+    final response = await http.get(
+      Uri.parse('$apiBaseUrl/blocks/${Uri.encodeComponent(blockId)}/answers'),
+      headers: AuthToken.headers(),
+    );
+    _ensureOk(response);
+    return jsonDecode(response.body) as List<dynamic>;
+  }
+
   Future<Map<String, dynamic>> getProgress() async {
     final response = await http.get(
       Uri.parse('$apiBaseUrl/me/progress'),
@@ -365,6 +374,7 @@ class ActivityTracker {
       'statement_response_answered',
       'media_canvas_posted',
       'media_completed',
+      'slider_changed',
     }.contains(action);
   }
 }
@@ -1560,9 +1570,12 @@ class _ChapterDetailState extends State<ChapterDetail> {
     return AnimatedBuilder(
       animation: LessonProgress.instance,
       builder: (context, _) {
+        final trackableEntries = routeEntries
+            .where((entry) => isTrackableBlock(entry.value))
+            .toList();
         final completedRouteCount = LessonProgress.instance.completedCount(
           chapterId,
-          routeEntries,
+          trackableEntries,
         );
         return SingleChildScrollView(
           padding: EdgeInsets.all(
@@ -1621,6 +1634,7 @@ class _ChapterDetailState extends State<ChapterDetail> {
                       entries: routeEntries,
                       chapterId: chapterId,
                       completedCount: completedRouteCount,
+                      totalCount: trackableEntries.length,
                       onJump: (originalIndex) {
                         final context = blockKeys[originalIndex].currentContext;
                         if (context == null) return;
@@ -1660,7 +1674,7 @@ class _ChapterDetailState extends State<ChapterDetail> {
                   const SizedBox(height: 12),
                   ChapterFinishPanel(
                     completedCount: completedRouteCount,
-                    totalCount: routeEntries.length,
+                    totalCount: trackableEntries.length,
                     isCompleted: widget.isCompleted,
                     hasNextChapter: widget.hasNextChapter,
                     onComplete: widget.onComplete,
@@ -1839,12 +1853,14 @@ class LessonRoutePanel extends StatelessWidget {
     required this.entries,
     required this.chapterId,
     required this.completedCount,
+    required this.totalCount,
     required this.onJump,
   });
 
   final List<MapEntry<int, Map<String, dynamic>>> entries;
   final String chapterId;
   final int completedCount;
+  final int totalCount;
   final ValueChanged<int> onJump;
 
   @override
@@ -1867,7 +1883,7 @@ class LessonRoutePanel extends StatelessWidget {
               Text('Lesroute', style: Theme.of(context).textTheme.titleMedium),
               const Spacer(),
               Text(
-                '$completedCount van ${entries.length} klaar',
+                '$completedCount van $totalCount klaar',
                 style: const TextStyle(
                   color: Color(0xFF66716C),
                   fontWeight: FontWeight.w800,
@@ -1884,10 +1900,12 @@ class LessonRoutePanel extends StatelessWidget {
               final routeIndex = routeEntry.key;
               final originalIndex = routeEntry.value.key;
               final block = routeEntry.value.value;
-              final isDone = LessonProgress.instance.isComplete(
-                chapterId,
-                block['id'] as String? ?? '',
-              );
+              final isDone =
+                  !isTrackableBlock(block) ||
+                  LessonProgress.instance.isComplete(
+                    chapterId,
+                    block['id'] as String? ?? '',
+                  );
               return ActionChip(
                 avatar: CircleAvatar(
                   backgroundColor: isDone
@@ -4378,6 +4396,40 @@ class BibleBlock extends StatelessWidget {
   }
 }
 
+const _interactiveBlockTypes = {
+  'bible',
+  'deep_dive',
+  'slider',
+  'multiple_choice',
+  'statement_response',
+  'challenge',
+  'sorting',
+  'youtube',
+  'media_player',
+  'audio',
+  'gallery',
+  'upload',
+  'distribution',
+};
+
+/// Blokken die de deelnemer kan "afronden". Puur leesblokken (tekst zonder
+/// vragen, quote) tellen niet mee in de lesroute-teller.
+bool isTrackableBlock(Map<String, dynamic> block) {
+  final type = block['type'] as String? ?? '';
+  if (type == 'quote' || type == 'hero' || type == 'reading_plan') {
+    return false;
+  }
+  if (_interactiveBlockTypes.contains(type)) return true;
+  final content = block['content'];
+  if (content is Map) {
+    for (final key in ['questions', 'discussion_questions', 'prompts']) {
+      final value = content[key];
+      if (value is List && value.isNotEmpty) return true;
+    }
+  }
+  return false;
+}
+
 final RegExp _bibleReferencePattern = RegExp(
   r'(([1-3]\s?)?[A-Za-zÀ-ÿ]{2,}\.?\s*\d+(?:\s*:\s*\d+(?:\s*[-–]\s*\d+)?)?)\s*$',
 );
@@ -5220,6 +5272,9 @@ class _QuestionFlowState extends State<QuestionFlow> {
   int activeIndex = 0;
   late final List<TextEditingController> controllers;
   final Map<int, String> lastTrackedAnswers = {};
+  List<Map<String, String>> otherEntries = [];
+  Timer? _refreshTimer;
+  bool _restoring = false;
 
   @override
   void initState() {
@@ -5228,14 +5283,58 @@ class _QuestionFlowState extends State<QuestionFlow> {
     for (var index = 0; index < controllers.length; index++) {
       controllers[index].addListener(() => _onAnswerChanged(index));
     }
+    if (widget.blockContext != null &&
+        widget.blockContext!.blockId.isNotEmpty) {
+      _loadAnswers(restoreOwn: true);
+      _refreshTimer = Timer.periodic(
+        const Duration(seconds: 30),
+        (_) => _loadAnswers(),
+      );
+    }
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     for (final controller in controllers) {
       controller.dispose();
     }
     super.dispose();
+  }
+
+  Future<void> _loadAnswers({bool restoreOwn = false}) async {
+    final blockId = widget.blockContext?.blockId ?? '';
+    final me = AppSession.current?.userId;
+    if (blockId.isEmpty || me == null) return;
+    try {
+      final answers = (await HouvastApi().getBlockAnswers(
+        blockId,
+      )).cast<Map<String, dynamic>>();
+      if (!mounted) return;
+      final others = <Map<String, String>>[];
+      _restoring = true;
+      for (final item in answers) {
+        final index = (item['question_index'] as num).toInt() - 1;
+        final answer = '${item['answer']}';
+        if (index < 0 || index >= controllers.length) continue;
+        if (item['user_id'] == me) {
+          if (restoreOwn && controllers[index].text.trim().isEmpty) {
+            lastTrackedAnswers[index] = answer;
+            controllers[index].text = answer;
+          }
+        } else {
+          others.add({
+            'name': '${item['username']}',
+            'label': '${widget.labelPrefix} ${index + 1}',
+            'answer': answer,
+          });
+        }
+      }
+      _restoring = false;
+      setState(() => otherEntries = others);
+    } catch (_) {
+      _restoring = false;
+    }
   }
 
   @override
@@ -5246,10 +5345,11 @@ class _QuestionFlowState extends State<QuestionFlow> {
       for (var index = 0; index < controllers.length; index++)
         if (_isValidAnswer(controllers[index].text))
           {
-            'name': AppSession.current?.username ?? 'Gast',
+            'name': AppSession.current?.username ?? 'Ik',
             'label': '${widget.labelPrefix} ${index + 1}',
             'answer': controllers[index].text.trim(),
           },
+      ...otherEntries,
     ];
     final activeText = controllers[activeIndex].text.trim();
     final remaining = widget.minCharacters - activeText.length;
@@ -5347,6 +5447,7 @@ class _QuestionFlowState extends State<QuestionFlow> {
 
   void _onAnswerChanged(int index) {
     setState(() {});
+    if (_restoring) return;
     final blockContext = widget.blockContext;
     if (blockContext == null || index < 0 || index >= controllers.length) {
       return;

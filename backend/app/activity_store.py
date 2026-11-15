@@ -128,3 +128,37 @@ def list_xp_awards(limit: int = 1000) -> list[dict[str, Any]]:
         }
         for row in rows
     ]
+
+
+def list_block_answers(block_id: str) -> list[dict[str, Any]]:
+    """Laatste antwoord per deelnemer per vraag voor één blok (voor groepsbord)."""
+    with connect() as connection:
+        rows = connection.execute(
+            """
+            SELECT user_id, username, role, value_json, created_at
+            FROM activity_events
+            WHERE block_id = ? AND action = 'question_answered'
+            ORDER BY created_at ASC, id ASC
+            """,
+            (block_id,),
+        ).fetchall()
+
+    latest: dict[tuple[str, int], dict[str, Any]] = {}
+    for row in rows:
+        try:
+            value = json.loads(row["value_json"])
+        except (TypeError, ValueError):
+            continue
+        index = value.get("question_index")
+        answer = str(value.get("answer", "")).strip()
+        if not isinstance(index, int) or not answer:
+            continue
+        latest[(row["user_id"], index)] = {
+            "user_id": row["user_id"],
+            "username": row["username"],
+            "role": row["role"],
+            "question_index": index,
+            "answer": answer,
+            "created_at": row["created_at"],
+        }
+    return sorted(latest.values(), key=lambda item: item["created_at"])
