@@ -7,6 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
+import 'admin_users.dart';
+import 'auth_token.dart';
+
 const _configuredAdminApiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
   defaultValue: '',
@@ -55,6 +58,7 @@ class _AdminBuilderState extends State<AdminBuilder> {
     setState(() => loading = true);
     final response = await http.get(
       Uri.parse('$adminApiBaseUrl/admin/courses/belijdenis/chapters'),
+      headers: AuthToken.headers(),
     );
     final loaded = (jsonDecode(response.body) as List<dynamic>)
         .cast<Map<String, dynamic>>();
@@ -67,6 +71,7 @@ class _AdminBuilderState extends State<AdminBuilder> {
   Future<void> openChapter(String chapterId) async {
     final response = await http.get(
       Uri.parse('$adminApiBaseUrl/chapters/$chapterId'),
+      headers: AuthToken.headers(),
     );
     setState(() {
       chapter = jsonDecode(response.body) as Map<String, dynamic>;
@@ -99,7 +104,7 @@ class _AdminBuilderState extends State<AdminBuilder> {
     if (chapter == null) return;
     final response = await http.post(
       Uri.parse('$adminApiBaseUrl/admin/chapters/save'),
-      headers: {'Content-Type': 'application/json'},
+      headers: AuthToken.headers(json: true),
       body: jsonEncode(chapter),
     );
     if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -116,7 +121,7 @@ class _AdminBuilderState extends State<AdminBuilder> {
   Future<void> exportExcel() async {
     final uri = Uri.parse(
       '$adminApiBaseUrl/admin/courses/belijdenis/export.xlsx',
-    );
+    ).replace(queryParameters: {'token': AuthToken.value ?? ''});
     final opened = await launchUrl(uri, webOnlyWindowName: '_blank');
     if (!opened) {
       setState(() => message = 'Export openen mislukt.');
@@ -169,6 +174,7 @@ class _AdminBuilderState extends State<AdminBuilder> {
       'POST',
       Uri.parse('$adminApiBaseUrl/admin/courses/belijdenis/import.xlsx'),
     );
+    request.headers.addAll(AuthToken.headers());
     request.files.add(
       http.MultipartFile.fromBytes('file', bytes, filename: file.name),
     );
@@ -201,6 +207,7 @@ class _AdminBuilderState extends State<AdminBuilder> {
             child: FutureBuilder<http.Response>(
               future: http.get(
                 Uri.parse('$adminApiBaseUrl/admin/activity?limit=200'),
+                headers: AuthToken.headers(),
               ),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
@@ -392,6 +399,16 @@ class _AdminBuilderState extends State<AdminBuilder> {
             onPressed: showActivity,
             icon: const Icon(Icons.analytics_outlined),
             label: const Text('Statistieken'),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.tonalIcon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => AdminUsersScreen(apiBaseUrl: adminApiBaseUrl),
+              ),
+            ),
+            icon: const Icon(Icons.group),
+            label: const Text('Deelnemers'),
           ),
           const SizedBox(height: 14),
           ...chapters.map(

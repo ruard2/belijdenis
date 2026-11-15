@@ -1,37 +1,10 @@
 from __future__ import annotations
 
 import json
-import uuid
 from datetime import datetime, timezone
 from typing import Any
 
 from app.database import connect
-
-
-ADMIN_PASSWORD = "ABCD1234"
-
-
-def create_guest_session(name: str | None = None) -> dict[str, str]:
-    session_id = uuid.uuid4().hex
-    suffix = session_id[:4].upper()
-    username = (name or "").strip() or f"Gast {suffix}"
-    return {
-        "session_id": session_id,
-        "user_id": f"guest-{suffix.lower()}",
-        "username": username,
-        "role": "guest",
-    }
-
-
-def create_admin_session(password: str) -> dict[str, str]:
-    if password != ADMIN_PASSWORD:
-        raise ValueError("Onjuist admin-wachtwoord.")
-    return {
-        "session_id": uuid.uuid4().hex,
-        "user_id": "admin",
-        "username": "Admin",
-        "role": "admin",
-    }
 
 
 def record_activity(payload: dict[str, Any]) -> dict[str, Any]:

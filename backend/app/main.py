@@ -3,17 +3,34 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.activity_store import (
-    create_admin_session,
-    create_guest_session,
     list_activity,
     list_xp_awards,
     record_activity,
+)
+from app.auth_store import (
+    AuthError,
+    UserNotFoundError,
+    admin_password_is_default,
+    annotate_chapters,
+    create_user,
+    delete_user,
+    get_progress,
+    get_session,
+    init_auth_db,
+    list_users,
+    login_admin,
+    login_user,
+    logout,
+    record_block_completion,
+    reset_pin,
+    set_chapter_completed,
+    update_user,
 )
 from app.bible_store import available_translations, get_passage
 from app.content_store import (
@@ -97,6 +114,48 @@ async def prevent_stale_frontend_cache(request, call_next):
 @app.on_event("startup")
 def startup() -> None:
     init_db()
+    init_auth_db()
+    if admin_password_is_default():
+        print("WAARSCHUWING: ADMIN_PASSWORD is niet ingesteld; standaardwachtwoord actief.")
+
+
+# ---------------------------------------------------------------------------
+# Authenticatie
+# ---------------------------------------------------------------------------
+
+
+def _token_from_header(authorization: str | None) -> str | None:
+    if authorization and authorization.lower().startswith("bearer "):
+        return authorization[7:].strip() or None
+    return None
+
+
+def optional_session(authorization: str | None = Header(default=None)) -> dict | None:
+    return get_session(_token_from_header(authorization))
+
+
+def require_session(session: dict | None = Depends(optional_session)) -> dict:
+    if session is None:
+        raise HTTPException(status_code=401, detail="Log opnieuw in.")
+    return session
+
+
+def require_admin(
+    authorization: str | None = Header(default=None),
+    token: str | None = Query(default=None),
+) -> dict:
+    session = get_session(_token_from_header(authorization) or token)
+    if session is None or session["role"] != "admin":
+        raise HTTPException(status_code=401, detail="Alleen voor admin.")
+    return session
+
+
+def _published_chapters(course_id: str) -> list[dict]:
+    try:
+        course_data = get_course(course_id)
+    except ContentNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return get_chapters_for_course(course_data["id"])
 
 
 @app.get("/", response_model=None)
@@ -115,34 +174,151 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/auth/guest")
-def auth_guest(payload: dict | None = None) -> dict:
-    return create_guest_session((payload or {}).get("name"))
+@app.post("/auth/login")
+def auth_login(payload: dict) -> dict:
+    try:
+        return login_user(str(payload.get("username", "")), str(payload.get("pin", "")))
+    except AuthError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
 
 
 @app.post("/auth/admin")
 def auth_admin(payload: dict) -> dict:
     try:
-        return create_admin_session(str(payload.get("password", "")))
-    except ValueError as exc:
+        return login_admin(str(payload.get("password", "")))
+    except AuthError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
 
 
+@app.get("/auth/me")
+def auth_me(session: dict = Depends(require_session)) -> dict:
+    return session
+
+
+@app.post("/auth/logout")
+def auth_logout(session: dict = Depends(require_session)) -> dict:
+    logout(session["token"])
+    return {"status": "ok"}
+
+
 @app.post("/activity")
-def activity(payload: dict) -> dict:
+def activity(payload: dict, session: dict = Depends(require_session)) -> dict:
+    # Gebruiker komt uit de sessie, niet uit de payload.
+    payload = {
+        **payload,
+        "session_id": session["token"][:16],
+        "user_id": session["user_id"],
+        "username": session["username"],
+        "role": session["role"],
+    }
     try:
-        return record_activity(payload)
+        result = record_activity(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    value = payload.get("value") or {}
+    if isinstance(value, dict) and (
+        value.get("block_completed") or (isinstance(value.get("xp_awarded"), int) and value["xp_awarded"] > 0)
+    ):
+        record_block_completion(
+            session["user_id"], str(payload.get("chapter_id", "")), str(payload.get("block_id", ""))
+        )
+    return result
+
+
+@app.get("/me/progress")
+def my_progress(session: dict = Depends(require_session)) -> dict:
+    return get_progress(session["user_id"])
+
+
+@app.post("/me/chapters/{chapter_id}/complete")
+def complete_my_chapter(chapter_id: str, session: dict = Depends(require_session)) -> dict:
+    try:
+        chapter_data = get_chapter(chapter_id)
+    except ContentNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    chapters = annotate_chapters(_published_chapters(chapter_data["course_id"]), session)
+    current = next((c for c in chapters if c["id"] == chapter_data["id"]), None)
+    if current is None or current["locked"]:
+        raise HTTPException(status_code=403, detail="Dit hoofdstuk is nog niet open.")
+    set_chapter_completed(session["user_id"], chapter_data["id"], chapter_data["course_id"], True)
+    chapters = annotate_chapters(_published_chapters(chapter_data["course_id"]), session)
+    ids = [c["id"] for c in chapters]
+    index = ids.index(chapter_data["id"])
+    next_chapter = chapters[index + 1] if index + 1 < len(chapters) else None
+    return {
+        "completed": chapter_data["id"],
+        "next_chapter": None
+        if next_chapter is None
+        else {"id": next_chapter["id"], "title": next_chapter["title"], "sort_order": next_chapter["sort_order"]},
+    }
+
+
+# ---------------------------------------------------------------------------
+# Gebruikersbeheer (admin)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/admin/users")
+def admin_users(_: dict = Depends(require_admin)) -> list[dict]:
+    return list_users()
+
+
+@app.post("/admin/users")
+def admin_create_user(payload: dict, _: dict = Depends(require_admin)) -> dict:
+    try:
+        return create_user(str(payload.get("display_name", "")), payload.get("username"))
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+@app.post("/admin/users/{user_id}/reset-pin")
+def admin_reset_pin(user_id: str, _: dict = Depends(require_admin)) -> dict:
+    try:
+        return reset_pin(user_id)
+    except UserNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.patch("/admin/users/{user_id}")
+def admin_update_user(user_id: str, payload: dict, _: dict = Depends(require_admin)) -> dict:
+    try:
+        return update_user(user_id, payload)
+    except UserNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.delete("/admin/users/{user_id}")
+def admin_delete_user(user_id: str, _: dict = Depends(require_admin)) -> dict:
+    try:
+        delete_user(user_id)
+    except UserNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"status": "deleted"}
+
+
+@app.post("/admin/users/{user_id}/chapters/{chapter_id}")
+def admin_set_user_chapter(
+    user_id: str, chapter_id: str, payload: dict, _: dict = Depends(require_admin)
+) -> dict:
+    try:
+        chapter_data = get_chapter(chapter_id)
+    except ContentNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    set_chapter_completed(
+        user_id, chapter_data["id"], chapter_data["course_id"], bool(payload.get("completed", True))
+    )
+    return {"status": "ok"}
+
+
 @app.get("/admin/activity")
-def admin_activity(limit: int = 300) -> list[dict]:
+def admin_activity(limit: int = 300, _: dict = Depends(require_admin)) -> list[dict]:
     return list_activity(limit)
 
 
 @app.get("/admin/xp")
-def admin_xp(limit: int = 1000) -> list[dict]:
+def admin_xp(limit: int = 1000, _: dict = Depends(require_admin)) -> list[dict]:
     return list_xp_awards(limit)
 
 
@@ -160,13 +336,8 @@ def course(course_id: str) -> dict:
 
 
 @app.get("/courses/{course_id}/chapters")
-def course_chapters(course_id: str) -> list[dict]:
-    try:
-        course_data = get_course(course_id)
-    except ContentNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    chapters = get_chapters_for_course(course_data["id"])
+def course_chapters(course_id: str, session: dict | None = Depends(optional_session)) -> list[dict]:
+    chapters = annotate_chapters(_published_chapters(course_id), session)
     return [
         {
             "id": chapter["id"],
@@ -179,21 +350,32 @@ def course_chapters(course_id: str) -> list[dict]:
             "status": chapter["status"],
             "sort_order": chapter["sort_order"],
             "block_count": chapter.get("block_count", 0),
+            "completed": chapter["completed"],
+            "locked": chapter["locked"],
         }
         for chapter in chapters
     ]
 
 
 @app.get("/chapters/{chapter_id}")
-def chapter(chapter_id: str) -> dict:
+def chapter(chapter_id: str, session: dict = Depends(require_session)) -> dict:
     try:
-        return get_chapter(chapter_id)
+        chapter_data = get_chapter(chapter_id)
     except ContentNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if session["role"] == "admin":
+        return chapter_data
+    chapters = annotate_chapters(_published_chapters(chapter_data["course_id"]), session)
+    current = next((c for c in chapters if c["id"] == chapter_data["id"]), None)
+    if current is None:
+        raise HTTPException(status_code=404, detail="Hoofdstuk niet gevonden.")
+    if current["locked"]:
+        raise HTTPException(status_code=403, detail="Rond eerst het vorige hoofdstuk af.")
+    return {**chapter_data, "completed": current["completed"]}
 
 
 @app.get("/admin/courses/{course_id}/chapters")
-def admin_course_chapters(course_id: str) -> list[dict]:
+def admin_course_chapters(course_id: str, _: dict = Depends(require_admin)) -> list[dict]:
     try:
         course_data = get_course(course_id)
     except ContentNotFoundError as exc:
@@ -202,7 +384,7 @@ def admin_course_chapters(course_id: str) -> list[dict]:
 
 
 @app.post("/admin/chapters/save")
-def admin_save_chapter(chapter_data: dict) -> dict:
+def admin_save_chapter(chapter_data: dict, _: dict = Depends(require_admin)) -> dict:
     try:
         return save_chapter(chapter_data)
     except KeyError as exc:
@@ -210,7 +392,7 @@ def admin_save_chapter(chapter_data: dict) -> dict:
 
 
 @app.get("/admin/courses/{course_id}/export.xlsx")
-def admin_export_course(course_id: str) -> Response:
+def admin_export_course(course_id: str, _: dict = Depends(require_admin)) -> Response:
     try:
         workbook = export_course_workbook(course_id)
     except ContentNotFoundError as exc:
@@ -225,7 +407,9 @@ def admin_export_course(course_id: str) -> Response:
 
 
 @app.post("/admin/courses/{course_id}/import.xlsx")
-async def admin_import_course(course_id: str, file: UploadFile = File(...)) -> dict:
+async def admin_import_course(
+    course_id: str, file: UploadFile = File(...), _: dict = Depends(require_admin)
+) -> dict:
     if not file.filename.lower().endswith(".xlsx"):
         raise HTTPException(status_code=422, detail="Upload een .xlsx bestand.")
 
@@ -252,7 +436,7 @@ def bible_passage(reference: str, translation: str = "HSV") -> dict:
 
 
 @app.post("/admin/reload-content")
-def reload_content() -> dict[str, str]:
+def reload_content(_: dict = Depends(require_admin)) -> dict[str, str]:
     reseed_database()
     return {"status": "reseeded"}
 
