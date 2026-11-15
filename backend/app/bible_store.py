@@ -347,9 +347,15 @@ def passage_candidates(
 
 
 def parse_reference(reference: str) -> dict[str, int | str]:
+    # Normaliseer: "1 Joh. 1:1–4" -> "1 Joh 1:1-4", "Joh.1 : 18" -> "Joh 1:18"
+    normalized = reference.replace("\u2013", "-").replace("\u2014", "-")
+    normalized = normalized.replace(".", " ")
+    normalized = re.sub(r"\s*([:\-])\s*", r"\1", normalized)
+    normalized = re.sub(r"([A-Za-zÀ-ÿ])(\d)", r"\1 \2", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
     match = re.match(
         r"^\s*([1-3]?\s*[A-Za-zÀ-ÿ]+)\s+(\d+)(?::(\d+)(?:-(\d+))?)?\s*$",
-        reference,
+        normalized,
     )
     if not match:
         raise ValueError(f"Kan Bijbelreferentie niet lezen: {reference}")

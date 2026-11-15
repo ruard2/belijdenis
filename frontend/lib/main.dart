@@ -292,6 +292,7 @@ class BlockContext {
     required this.blockId,
     required this.blockType,
     required this.xp,
+    this.blockTitle = '',
   });
 
   final String courseId;
@@ -299,6 +300,7 @@ class BlockContext {
   final String blockId;
   final String blockType;
   final int xp;
+  final String blockTitle;
 }
 
 class LessonProgress extends ChangeNotifier {
@@ -1282,6 +1284,7 @@ class _ChapterDetailState extends State<ChapterDetail> {
                         blockId: block['id'] as String? ?? '',
                         blockType: block['type'] as String? ?? '',
                         xp: block['xp'] as int? ?? 0,
+                        blockTitle: block['title'] as String? ?? '',
                       ),
                       isComplete: LessonProgress.instance.isComplete(
                         chapterId,
@@ -1323,6 +1326,7 @@ class _ChapterDetailState extends State<ChapterDetail> {
                         blockId: block['id'] as String? ?? '',
                         blockType: block['type'] as String? ?? '',
                         xp: block['xp'] as int? ?? 0,
+                        blockTitle: block['title'] as String? ?? '',
                       ),
                       isComplete: LessonProgress.instance.isComplete(
                         chapterId,
@@ -3833,10 +3837,16 @@ class BibleBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final references = <String>[
-      if (content['reference'] is String) content['reference'] as String,
+      if (content['reference'] != null) '${content['reference']}',
       if (content['references'] is List)
         ...(content['references'] as List).map((item) => '$item'),
-    ];
+    ].map((item) => item.trim()).where((item) => item.isNotEmpty).toList();
+    if (references.isEmpty) {
+      // Geen referentie ingevuld: probeer hem uit de bloktitel te halen,
+      // bijv. "God kennen door je verstand: 1 Joh. 1:1-4".
+      final fromTitle = extractBibleReference(blockContext.blockTitle);
+      if (fromTitle != null) references.add(fromTitle);
+    }
     final questions = (content['questions'] as List<dynamic>? ?? const [])
         .map((item) => '$item')
         .toList();
@@ -3881,6 +3891,16 @@ class BibleBlock extends StatelessWidget {
       ],
     );
   }
+}
+
+final RegExp _bibleReferencePattern = RegExp(
+  r'(([1-3]\s?)?[A-Za-zÀ-ÿ]{2,}\.?\s*\d+(?:\s*:\s*\d+(?:\s*[-–]\s*\d+)?)?)\s*$',
+);
+
+/// Haalt een bijbelverwijzing aan het eind van een tekst op, of null.
+String? extractBibleReference(String text) {
+  final match = _bibleReferencePattern.firstMatch(text.trim());
+  return match?.group(1)?.trim();
 }
 
 /// Klikbare bijbeltekst-chips: openen de bijbellezer (zelfde als leesrooster).
