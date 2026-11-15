@@ -398,11 +398,65 @@ def update_user(user_id: str, changes: dict[str, Any]) -> dict:
     return _user_from_row(row)
 
 
-def delete_user(user_id: str) -> None:
+# Tabellen met per-gebruiker data die bij verwijderen volledig weg moeten.
+USER_TABLES = (
+    "auth_sessions",
+    "chapter_completions",
+    "block_completions",
+    "activity_events",
+    "xp_awards",
+    "board_items",
+    "uploads",
+)
+
+
+def _reaction_patterns(user_id: str) -> list[str]:
+    """Reacties/emoji's van anderen die naar berichten van deze gebruiker wijzen."""
+    return [
+        f'%"target": "{user_id}:%',
+        f'%"target": "dist:{user_id}"%',
+    ]
+
+
+def user_content_summary(user_id: str) -> dict[str, int]:
     with connect() as connection:
         _require_user(connection, user_id)
-        for table in ("auth_sessions", "chapter_completions", "block_completions"):
+
+        def count(sql: str, params: tuple) -> int:
+            row = connection.execute(sql, params).fetchone()
+            return int(row["n"] or 0) if row else 0
+
+        answers = count(
+            "SELECT COUNT(*) AS n FROM activity_events WHERE user_id = ? AND action = 'question_answered'",
+            (user_id,),
+        )
+        posts = count(
+            "SELECT COUNT(*) AS n FROM board_items WHERE user_id = ? AND kind IN ('reply', 'media', 'distribution', 'annotation', 'read')",
+            (user_id,),
+        )
+        uploads = count("SELECT COUNT(*) AS n FROM uploads WHERE user_id = ?", (user_id,))
+        activity = count("SELECT COUNT(*) AS n FROM activity_events WHERE user_id = ?", (user_id,))
+        reactions_on = sum(
+            count("SELECT COUNT(*) AS n FROM board_items WHERE data_json LIKE ?", (pattern,))
+            for pattern in _reaction_patterns(user_id)
+        )
+    return {
+        "answers": answers,
+        "posts": posts,
+        "uploads": uploads,
+        "activity": activity,
+        "reactions_from_others": reactions_on,
+    }
+
+
+def delete_user(user_id: str) -> None:
+    """Verwijdert de gebruiker en alles wat hij/zij geplaatst of opgebouwd heeft."""
+    with connect() as connection:
+        _require_user(connection, user_id)
+        for table in USER_TABLES:
             connection.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
+        for pattern in _reaction_patterns(user_id):
+            connection.execute("DELETE FROM board_items WHERE data_json LIKE ?", (pattern,))
         connection.execute("DELETE FROM users WHERE id = ?", (user_id,))
 
 

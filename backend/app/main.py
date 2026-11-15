@@ -33,6 +33,7 @@ from app.auth_store import (
     reset_pin,
     set_chapter_completed,
     update_user,
+    user_content_summary,
 )
 from app.board_store import (
     BoardError,
@@ -381,6 +382,14 @@ def admin_update_user(user_id: str, payload: dict, _: dict = Depends(require_adm
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/admin/users/{user_id}/content")
+def admin_user_content(user_id: str, _: dict = Depends(require_admin)) -> dict:
+    try:
+        return user_content_summary(user_id)
+    except UserNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.delete("/admin/users/{user_id}")

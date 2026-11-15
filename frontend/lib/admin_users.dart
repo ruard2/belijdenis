@@ -214,15 +214,34 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   }
 
   Future<void> _delete(Map<String, dynamic> user) async {
+    Map<String, dynamic> summary = {};
+    try {
+      final response = await _send('GET', '/admin/users/${user['id']}/content');
+      summary = jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (_) {}
+    int n(String key) => (summary[key] as num?)?.toInt() ?? 0;
+    final lines = <String>[
+      if (n('answers') > 0) '• ${n('answers')} antwoorden op vragen',
+      if (n('posts') > 0)
+        '• ${n('posts')} berichten (reacties, klasbord, verdelingen, aantekeningen, leesrooster)',
+      if (n('uploads') > 0) "• ${n('uploads')} geüploade foto's/video's",
+      if (n('reactions_from_others') > 0)
+        "• ${n('reactions_from_others')} reacties/emoji's van anderen op deze berichten",
+    ];
+    if (!mounted) return;
     final confirmed = await _confirm(
       '${user['display_name']} verwijderen?',
-      'Het account en de hoofdstuk-voortgang worden verwijderd. Dit kan niet ongedaan worden.',
-      'Verwijderen',
+      'Het account wordt verwijderd met alles wat ${user['display_name']} geplaatst heeft:'
+          '\n\n${lines.isEmpty ? '• (nog niets geplaatst)' : lines.join('\n')}'
+          '\n• voortgang, XP en activiteit'
+          '\n\nDit kan niet ongedaan worden. Alleen tijdelijk blokkeren? Kies dan Deactiveren.',
+      'Alles verwijderen',
     );
     if (!confirmed) return;
     await _run(() async {
       await _send('DELETE', '/admin/users/${user['id']}');
       await _load();
+      _toast('${user['display_name']} en alle bijbehorende gegevens zijn verwijderd.');
     });
   }
 
